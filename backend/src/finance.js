@@ -11,7 +11,9 @@ async function billData(db,officeId,m){
  const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[officeId,m]);
  if(batch)return {batch,rows:await all(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 ORDER BY customer_name,id',[batch.id])};
  const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[officeId]);
- return {batch:null,rows:customers.map(c=>({...c,...billLine(c.monthly_bill,c.previous_due),customer_db_id:c.id}))};
+ const payments=await all(db,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS amount FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[officeId,m]);
+ const paidByCustomer=new Map(payments.map(p=>[String(p.customer_db_id),p.amount]));
+ return {batch:null,rows:customers.map(c=>({...c,...billLine(c.monthly_bill,c.previous_due,paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
 }
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
@@ -99,8 +101,7 @@ finance.get('/slips',async(req,res)=>{
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
- if(!batch){const payments=await all(pool,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[id,m]);const map=new Map(payments.map(p=>[String(p.customer_db_id),p.n]));for(const r of rows){const p=billLine(r.monthly_bill,r.previous_due,map.get(String(r.customer_db_id))||0);r.paid_amount=p.paid_amount;r.balance_due=p.balance_due;r.status=p.status;}}
  const sum=key=>taka(rows.reduce((n,r)=>n+cents(r[key]),0));
  const isp=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments WHERE office_id=$1 AND (bill_month=$2 OR TO_CHAR(payment_date,'YYYY-MM')=$2 OR bill_month LIKE $3)",[id,m,m+'%']);
- res.json({month:m,office_id:id,processed:!!batch,count:rows.length,monthly:sum('monthly_bill'),previous_due:sum('previous_due'),total_due:sum('total_due'),paid:sum('paid_amount'),balance:sum('balance_due'),isp:isp.n,profit:taka(cents(sum('paid'))-cents(isp.n)),rows});
+ res.json({month:m,office_id:id,processed:!!batch,count:rows.length,monthly:sum('monthly_bill'),previous_due:sum('previous_due'),total_due:sum('total_due'),paid:sum('paid_amount'),balance:sum('balance_due'),isp:isp.n,profit:taka(cents(sum('paid_amount'))-cents(isp.n)),rows});
 });

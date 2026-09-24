@@ -1,4 +1,7 @@
 import pg from 'pg';
+// PostgreSQL DATE has no time zone; keep it as YYYY-MM-DD instead of shifting
+// it through the server's local time zone when JSON serializes a Date object.
+pg.types.setTypeParser(pg.types.builtins.DATE, value => value);
 // Each Vercel instance has its own pool. Keep it small and use Neon's pooled URL.
 export const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,max:2,connectionTimeoutMillis:10000,idleTimeoutMillis:10000});
 export async function tx(fn) {
