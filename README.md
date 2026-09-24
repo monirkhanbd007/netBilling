@@ -25,7 +25,7 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 
 ## Requirements
 
-- Node.js 20+ and PostgreSQL 14+.
+- Node.js 24 LTS (with npm) and PostgreSQL 14+.
 - A PostgreSQL database and a database user with permission to create tables.
 
 ## Deploy the frontend and backend separately on Vercel
@@ -95,20 +95,42 @@ The local `restore-backup.js` writes a safety file under `recovery-backups/`;
 run it on a persistent local computer if ever needed, **not** inside a Vercel
 Function, whose filesystem is not suitable for persistent backup files.
 
-## Local setup
+## Local setup on Windows
 
-```bash
-cp .env.example .env
-# Edit DATABASE_URL and set a unique BOOTSTRAP_PASSWORD (at least 12 characters).
-# Export the variables in .env for the shell, or load them with your process manager.
-set -a; . ./.env; set +a
-npm install
-npm run init -w backend
-npm run dev
-```
+1. Install Node.js 24 LTS (including npm) and PostgreSQL. Open a **new
+   PowerShell window** and confirm `node --version` and `npm --version` work.
+   In pgAdmin or `psql`, create a login role named `ibm` and a database named
+   `internet_business` owned by that role. Keep the PostgreSQL service running.
+2. From the repository root, create a local environment file and edit it:
 
-Open `http://localhost:5173` and use `BOOTSTRAP_USER` / `BOOTSTRAP_PASSWORD`.
-Locally, Vite forwards `/api` to the Node.js server on port `3001`. For a
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+
+   Replace the password in `DATABASE_URL` with the `ibm` database user's
+   password, and set a unique `BOOTSTRAP_PASSWORD` of at least 12 characters.
+   If the database password contains URI special characters such as `@`, `:`,
+   `/`, or `#`, percent-encode them in `DATABASE_URL`. Leave
+   `APP_ORIGIN=http://localhost:5173` and `NODE_ENV=development` for local use.
+   The `.env` file is ignored by Git and is loaded by the backend scripts.
+3. Install dependencies, create the schema and first administrator, then start
+   both apps:
+
+   ```powershell
+   npm ci
+   npm run init -w backend
+   npm run dev
+   ```
+
+Open `http://localhost:5173` and sign in with `BOOTSTRAP_USER` and
+`BOOTSTRAP_PASSWORD`. Check `http://localhost:5173/api/health` for
+`{"ok":true}`; this confirms the backend can reach PostgreSQL. Vite forwards
+`/api` to the Node.js server on port `3001`. If port 5173 is occupied, use
+the URL shown by Vite and set `APP_ORIGIN` in `.env`
+to that same origin, then restart `npm run dev`.
+
+For a
 non-Vercel production setup, host the built Vue `frontend/dist` files and the
 Node.js `backend` process separately; route the frontend's `/api` path to the
 backend and set `APP_ORIGIN` to the frontend origin.
