@@ -1,0 +1,1 @@
+{"name":"ibm-server","private":true,"type":"module","scripts":{"dev":"node --watch src/index.js","start":"node src/index.js","init":"node scripts/init.js","import":"node scripts/import-backup.js","restore":"node scripts/restore-backup.js","test":"node --test"},"dependencies":{"bcryptjs":"^2.4.3","express":"^5.1.0","pg":"^8.13.3"}}
