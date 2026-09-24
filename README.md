@@ -135,6 +135,15 @@ non-Vercel production setup, host the built Vue `frontend/dist` files and the
 Node.js `backend` process separately; route the frontend's `/api` path to the
 backend and set `APP_ORIGIN` to the frontend origin.
 
+## Print bill slips
+
+In **Bill Slip**, choose the office and month, then select **Preview & Print
+A4**. The preview uses the office name, address, and payment phone from Office
+Management; customer and bill figures come from the database. Print on **A4
+landscape** at **100% scale**. Each page contains two customer pairs: an office
+copy and a customer copy for each, with dashed cut guides. Customers whose
+total bill is zero are omitted. The support phone comes from Settings.
+
 The SQL schema is in `backend/sql/001_schema.sql`. Initialization is safe to run again: it creates tables if missing and only creates an administrator when there are no users.
 
 ## Migrate WordPress data
