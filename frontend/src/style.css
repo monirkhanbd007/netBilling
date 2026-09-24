@@ -4,3 +4,4 @@
 @media print{.sidebar,.topbar,.heading-controls,.button-group,.alert,.notice{display:none!important}.content{padding:0}.panel{border:0;box-shadow:none}.work{width:100%}body{background:white}.report-panel{display:block}td,th{padding:7px;font-size:9px}}
 .metric-placeholder{min-height:122px}.placeholder-line{display:block;height:12px;border-radius:999px;background:#e8eff2;animation:placeholder-pulse 1.5s ease-in-out infinite}.placeholder-line.short{width:44%}.placeholder-line.medium{width:55%}.placeholder-line.value{width:65%;height:28px;margin:18px 0 12px}.placeholder-line.wide{width:100%;margin-top:20px}.dashboard-placeholder{padding:24px}@keyframes placeholder-pulse{50%{opacity:.48}}@media(prefers-reduced-motion:reduce){.placeholder-line{animation:none}}
 .month-name{color:#247f82;font-size:11px;font-weight:800;letter-spacing:.01em}
+.form-hint{color:#80919d;font-size:11px;font-weight:600}

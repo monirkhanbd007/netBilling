@@ -54,7 +54,7 @@ entities.post('/:name',async(req,res)=>{
     if(!['Super Admin','Office Admin','Collection User','Support User'].includes(data.role))fail(400,'Invalid role.');
     if(data.role==='Super Admin'){onlySuper(u);data.office_id=0;}
     else {data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
-    errorIfMissing(b.password,'password');if(String(b.password).length<12)fail(400,'Password must contain at least 12 characters.');data.password=await bcrypt.hash(String(b.password),12);
+    errorIfMissing(b.password,'password');if(String(b.password).length<8)fail(400,'Password must contain at least 8 characters.');data.password=await bcrypt.hash(String(b.password),12);
   }
   if(def.append){const c=await one(pool,'SELECT * FROM ib_customers WHERE id=$1 AND status=$2',[b.customer_db_id,'active']);if(!c)fail(400,'Select an active customer.');requireOffice(u,c.office_id);
     data={customer_db_id:c.id,customer_id:c.customer_id};
@@ -82,7 +82,7 @@ entities.put('/:name/:id',async(req,res)=>{
     if(data.role==='Super Admin'&&!superAdmin(u))fail(403,'Cannot promote to Super Admin.');
     if(data.role&&!['Super Admin','Office Admin','Collection User','Support User'].includes(data.role))fail(400,'Invalid role.');
     if(data.role==='Super Admin'){onlySuper(u);data.office_id=0;}
-    if(b.password){if(String(b.password).length<12)fail(400,'Password must contain at least 12 characters.');data.password=await bcrypt.hash(String(b.password),12);}
+    if(b.password){if(String(b.password).length<8)fail(400,'Password must contain at least 8 characters.');data.password=await bcrypt.hash(String(b.password),12);}
   }
   delete data.invoice_no;
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');
