@@ -18,15 +18,16 @@ async function billData(db,officeId,m){
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
  const offices=await all(pool,`SELECT * FROM ib_offices WHERE status='active' ${officeId?'AND id=$1':''} ORDER BY office_name`,officeId?[officeId]:[]);
- const rows=[];
- for(const o of offices){const id=o.id;
-  const c=await one(pool,"SELECT COUNT(*) FILTER(WHERE status='active') AS active, COUNT(*) FILTER(WHERE status='inactive') AS inactive,COALESCE(SUM(monthly_bill) FILTER(WHERE status='active'),0) AS billing FROM ib_customers WHERE office_id=$1",[id]);
-  const received=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND (bill_month=$2 OR (bill_month='' AND TO_CHAR(payment_date,'YYYY-MM')=$2))",[id,m]);
-  const isp=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments WHERE office_id=$1 AND (bill_month=$2 OR (bill_month='' AND TO_CHAR(payment_date,'YYYY-MM')=$2))",[id,m]);
-  const expenses=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_office_expenses WHERE office_id=$1 AND TO_CHAR(expense_date,'YYYY-MM')=$2",[id,m]);
-  const salary=await one(pool,'SELECT COALESCE(SUM(total_salary),0) AS n FROM ib_staff_salary WHERE office_id=$1 AND salary_month=$2',[id,m]);
-  rows.push({office_id:id,office_name:o.office_name,manager:o.manager,active:Number(c.active),inactive:Number(c.inactive),billing:c.billing,received:received.n,isp:isp.n,expenses:expenses.n,salary:salary.n,...financial(c.billing,received.n,isp.n,expenses.n,salary.n)});
- }
+ const rows=await Promise.all(offices.map(async o=>{const id=o.id;
+  const [c,received,isp,expenses,salary]=await Promise.all([
+   one(pool,"SELECT COUNT(*) FILTER(WHERE status='active') AS active, COUNT(*) FILTER(WHERE status='inactive') AS inactive,COALESCE(SUM(monthly_bill) FILTER(WHERE status='active'),0) AS billing FROM ib_customers WHERE office_id=$1",[id]),
+   one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND (bill_month=$2 OR (bill_month='' AND TO_CHAR(payment_date,'YYYY-MM')=$2))",[id,m]),
+   one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments WHERE office_id=$1 AND (bill_month=$2 OR (bill_month='' AND TO_CHAR(payment_date,'YYYY-MM')=$2))",[id,m]),
+   one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_office_expenses WHERE office_id=$1 AND TO_CHAR(expense_date,'YYYY-MM')=$2",[id,m]),
+   one(pool,'SELECT COALESCE(SUM(total_salary),0) AS n FROM ib_staff_salary WHERE office_id=$1 AND salary_month=$2',[id,m])
+  ]);
+  return {office_id:id,office_name:o.office_name,manager:o.manager,active:Number(c.active),inactive:Number(c.inactive),billing:c.billing,received:received.n,isp:isp.n,expenses:expenses.n,salary:salary.n,...financial(c.billing,received.n,isp.n,expenses.n,salary.n)};
+ }));
  res.json({month:m,rows});
 });
 finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month);res.json({month:m,office_id:id,...await billData(pool,id,m)});});
