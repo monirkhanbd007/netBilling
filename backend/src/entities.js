@@ -35,6 +35,10 @@ entities.get('/:name',async(req,res)=>{
     const field=req.params.name==='customers'?"(customer_id ILIKE $N OR customer_name ILIKE $N OR mobile ILIKE $N OR area ILIKE $N)":"package_name ILIKE $N";
     const token='$'+(params.length+1);where+=(where?' AND ':'WHERE ')+field.replaceAll('$N',token);params.push('%'+String(req.query.search).slice(0,100)+'%');
   }
+  if(req.params.name==='isp-payments'&&req.query.month){
+    params.push(month(req.query.month));
+    where+=(where?' AND ':'WHERE ')+`bill_month=$${params.length}`;
+  }
   const rows=await all(pool,`SELECT ${def.secret?'id,office_id,name,username,role,status,created_date':'*'} FROM ${def.table} ${where} ORDER BY id DESC LIMIT 2000`,params);res.json(rows);
 });
 entities.post('/:name',async(req,res)=>{
