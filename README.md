@@ -28,17 +28,21 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 - Node.js 20+ and PostgreSQL 14+.
 - A PostgreSQL database and a database user with permission to create tables.
 
-## Deploy on Vercel with an existing Neon database
+## Deploy from GitHub to Vercel
 
 This repository includes `api/index.mjs` and `vercel.json` so Vercel serves the
 Vue build and runs the existing Express API on the **same domain**. The API
 still uses `DATABASE_URL`; Vercel does not run `npm start`, `npm run init`, or
 the import script during deployment. Deploying code does not erase Neon data.
 
-1. If your Neon tables already contain users/data, keep that database. If the
-   tables are empty, create the first administrator **once**, on your own
-   machine, after pointing `DATABASE_URL` at Neon and setting a unique
-   `BOOTSTRAP_USER` and a `BOOTSTRAP_PASSWORD` of at least 12 characters:
+1. Create a Neon PostgreSQL database, or use the existing database if it
+   already contains this app's tables and users. Copy its **pooled** connection
+   string from Neon's Connect dialog (turn on Connection pooling). Keep the
+   connection string private; it is a database credential.
+2. Initialize an empty database **once** on your own machine. Set
+   `DATABASE_URL` to that Neon connection string, `BOOTSTRAP_USER` to a unique
+   administrator name, and `BOOTSTRAP_PASSWORD` to a unique password of at
+   least 12 characters. Then run, from the repository root:
 
    ```bash
    npm ci
@@ -46,35 +50,40 @@ the import script during deployment. Deploying code does not erase Neon data.
    ```
 
    `init` creates missing tables and adds the initial admin only when the
-   `ib_users` table has no users. Do not run a WordPress backup import on an
-   occupied database. Do not put credentials in Git or in the client/Vite env.
-2. Push the **contents of this project directory** (`package.json`,
-   `package-lock.json`, `client/`, `server/`, `api/`, `vercel.json`) to a private
-   Git repository. In Vercel, choose **Add New → Project → Import repository**.
-   Set Root Directory to this project directory if the Git repository has a
-   parent folder. Use Framework Preset **Vite**, Install Command `npm ci`,
-   Build Command `npm run build`, and Output Directory `client/dist` (also set
-   by `vercel.json`). Node.js 20 or newer is required.
-3. Under **Project → Settings → Environment Variables**, set `DATABASE_URL`
-   for Production to Neon's **pooled** PostgreSQL connection string (the
-   Connect dialog's Connection pooling toggle; normally the hostname has
-   `-pooler`). Use the connection string as supplied by Neon, including its
-   SSL setting. Set `NODE_ENV=production`. `APP_ORIGIN` may be the final
-   `https://...` production domain; same-origin requests on Vercel also work
-   without this variable. `BOOTSTRAP_PASSWORD` is only used for one-time
-   local initialization and must not be a public `VITE_` variable.
-4. Deploy. Open `https://YOUR-DOMAIN/api/health` (should return `{"ok":true}`),
+   `ib_users` table has no users. If the database already has this app's users,
+   skip initialization. Do not import a WordPress backup into an occupied
+   database. Keep the connection string and bootstrap password out of Git and
+   out of any `VITE_` variable.
+3. Push this repository to GitHub. Its existing remote is
+   `https://github.com/monirkhanbd007/ispbill.git`; the Vercel project root is
+   the repository root (the folder containing `vercel.json`). If you have
+   local changes to publish, commit them and run `git push origin main`.
+4. In Vercel, choose **Add New → Project**, connect GitHub if prompted, and
+   import `monirkhanbd007/ispbill`. Keep **Root Directory** as `./` and use
+   **Framework Preset: Vite**. The checked-in `vercel.json` specifies
+   **Install Command: `npm ci --include=dev`**, **Build Command: `npm run build`**, and
+   **Output Directory: `client/dist`**. Use Node.js **24.x** in Vercel's
+   project settings if a version choice appears. Including dev dependencies
+   ensures Vite is installed even when `NODE_ENV=production` is set.
+5. Before clicking **Deploy**, open **Environment Variables** in the import
+   form. Add `DATABASE_URL` with the Neon pooled connection string for
+   **Production**. Add `NODE_ENV=production` for Production. Leave
+   `APP_ORIGIN` unset unless you need to restrict requests to a specific
+   production domain; same-origin requests work without it. Do not add
+   `BOOTSTRAP_PASSWORD` to Vercel. If the project has already been created,
+   add these under **Project → Settings → Environment Variables** and redeploy.
+6. Deploy. Open `https://YOUR-DOMAIN/api/health` (should return `{"ok":true}`),
    then sign in and check an office, a customer, and one known monthly bill.
    A working health check confirms DB connectivity, but sign-in also checks
    that the expected schema and users exist. If the API returns 500, check
    Vercel's function logs and the Neon connection string. If login returns
    403, check `APP_ORIGIN` and the deployment URL, including `https`.
 
-**Preview deployments:** Use a separate Neon branch/database for Preview and
-its own `DATABASE_URL` in Vercel. A preview connected to the live production
-database can write real records. If you later add a custom domain, update
-`APP_ORIGIN` to that domain if you set it. Environment-variable changes require
-a new deployment.
+**Preview deployments:** If you enable Preview, use a separate Neon
+branch/database and set its `DATABASE_URL` for Preview in Vercel. A preview
+connected to the live production database can write real records. If you later
+add a custom domain, update `APP_ORIGIN` to that domain if you set it.
+Environment-variable changes require a new deployment.
 
 ### Publishing later changes
 
