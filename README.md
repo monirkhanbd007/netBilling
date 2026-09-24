@@ -31,7 +31,7 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 ## Deploy the frontend and backend separately on Vercel
 
 Create **two Vercel projects from this one GitHub repository**. The Vue project
-uses `client/` as its root; the Node.js/Express project uses `server/` as its
+uses `frontend/` as its root; the Node.js/Express project uses `backend/` as its
 root. PostgreSQL is hosted separately (for example, on Neon). Only the backend
 has database credentials. Browser requests go to the Vue project's `/api` path;
 its small proxy sends them to the backend, so login keeps using an HTTP-only
@@ -41,19 +41,19 @@ cookie on the frontend domain.
    already contains this app's data. Copy its **pooled** connection string.
    For an empty database, set `DATABASE_URL`, a unique `BOOTSTRAP_USER`, and a
    `BOOTSTRAP_PASSWORD` of at least 12 characters on your computer. From the
-   repository root, run `npm ci` and `npm run init -w server` **once**. Skip
+   repository root, run `npm ci` and `npm run init -w backend` **once**. Skip
    this step if `ib_users` already contains users. Do not put these credentials
    in Git or in a `VITE_` variable.
 2. Push this repository to GitHub at `monirkhanbd007/ispbill`. In Vercel, select
    **Add New → Project**, import that repository, and create the **backend**
-   project with **Root Directory: `server`** and **Framework Preset: Express**.
-   `server/vercel.json` runs `npm ci --workspaces=false`; Vercel detects `server/src/index.js` as
+   project with **Root Directory: `backend`** and **Framework Preset: Express**.
+   `backend/vercel.json` runs `npm ci --workspaces=false`; Vercel detects `backend/src/index.js` as
    the Express entry point. Set `DATABASE_URL` to the pooled connection string
    and `NODE_ENV=production` for Production before deploying. Do not set
    `BOOTSTRAP_PASSWORD` in Vercel. Deploy, copy the backend's `https://...`
    domain, and check `https://BACKEND-DOMAIN/api/health` for `{"ok":true}`.
 3. Create a second Vercel project from the **same repository** with **Root
-   Directory: `client`** and **Framework Preset: Vite**. `client/vercel.json`
+   Directory: `frontend`** and **Framework Preset: Vite**. `frontend/vercel.json`
    runs `npm ci --workspaces=false --include=dev`, builds with
    `npm run build --workspaces=false`, and publishes
    `dist`. Set `BACKEND_URL` for Production to the backend's HTTPS origin,
@@ -77,14 +77,14 @@ write real billing records. Environment-variable changes require a redeploy.
 ### Publishing later changes
 
 Keep both Vercel projects connected to the same Git repository. Edit the Vue
-client, Express API, and/or SQL as needed, run `npm test` and `npm run build`,
+frontend, Express API, and/or SQL as needed, run `npm test` and `npm run build`,
 then commit and push. Vercel redeploys both projects automatically from `main`.
 The backend `DATABASE_URL` still points to the same Neon database, so existing
 data remains. Test changes in Preview with a separate Neon branch first.
 
 For new tables or columns, save a **versioned, reviewed SQL migration** and
 run it against a backed-up Neon database before deploying code that requires
-it. `server/sql/001_schema.sql` is an initial schema, not an automatic
+it. `backend/sql/001_schema.sql` is an initial schema, not an automatic
 migration system. Favor additive migrations so an older deployment can still
 work during a rollback; code rollback does not undo database migrations.
 Record every migration applied to production. Take a Neon database backup or
@@ -103,17 +103,17 @@ cp .env.example .env
 # Export the variables in .env for the shell, or load them with your process manager.
 set -a; . ./.env; set +a
 npm install
-npm run init -w server
+npm run init -w backend
 npm run dev
 ```
 
 Open `http://localhost:5173` and use `BOOTSTRAP_USER` / `BOOTSTRAP_PASSWORD`.
 Locally, Vite forwards `/api` to the Node.js server on port `3001`. For a
-non-Vercel production setup, host the built Vue `client/dist` files and the
-Node.js `server` process separately; route the frontend's `/api` path to the
+non-Vercel production setup, host the built Vue `frontend/dist` files and the
+Node.js `backend` process separately; route the frontend's `/api` path to the
 backend and set `APP_ORIGIN` to the frontend origin.
 
-The SQL schema is in `server/sql/001_schema.sql`. Initialization is safe to run again: it creates tables if missing and only creates an administrator when there are no users.
+The SQL schema is in `backend/sql/001_schema.sql`. Initialization is safe to run again: it creates tables if missing and only creates an administrator when there are no users.
 
 ## Migrate WordPress data
 
@@ -121,7 +121,7 @@ The SQL schema is in `server/sql/001_schema.sql`. Initialization is safe to run 
 2. On a **new, otherwise empty** PostgreSQL database, initialize the schema and run:
 
    ```bash
-   npm run import -w server -- /absolute/path/to/backup.ibmbak.gz
+   npm run import -w backend -- /absolute/path/to/backup.ibmbak.gz
    ```
 
 3. Import retains office, customer, package, bill, payment, salary and expense IDs and original user accounts. It creates one new Super Admin using the bootstrap credentials so you can sign in even if a legacy password was generated by an unusual WordPress plugin.
@@ -134,7 +134,7 @@ The import runs in one database transaction and refuses to overwrite an occupied
 The **Database Backup** screen downloads a `IBM_PG_V1` JSON snapshot. To restore, stop the app so no writes occur, take a separate database backup, set the environment variables and run:
 
 ```bash
-npm run restore -w server -- /absolute/path/to/internet-business-backup.json --confirm
+npm run restore -w backend -- /absolute/path/to/internet-business-backup.json --confirm
 ```
 
 Restore saves a `before-restore-*.json` safety copy in `recovery-backups/`, then replaces the business records in a single transaction. Sessions are cleared. Restrict access to these files: they include user password hashes and customer PPPoE credentials. The backup format is not SQL and should only be opened by trusted administrators.
