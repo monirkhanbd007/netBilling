@@ -3,6 +3,7 @@ import {Router} from 'express';
 import {pool,tx,one,all,fail,month,date,money,currentMonth,today} from './db.js';
 import {scope,requireOffice,superAdmin} from './auth.js';
 import {billLine,financial,cents,taka} from './calculations.js';
+import {readSupportPhone} from './support-phone.js';
 
 export const finance=Router();
 const officeOf=(u,v)=>{const n=scope(u,v);return requireOffice(u,n);};
@@ -94,9 +95,9 @@ finance.get('/slips',async(req,res)=>{
  const customerId=Number(req.query.customer_db_id||0),filtered=customerId?rows.filter(r=>Number(r.customer_db_id)===customerId):rows;
  const ids=filtered.map(r=>r.customer_db_id);const customers=ids.length?await all(pool,'SELECT id,address,pppoe_username FROM ib_customers WHERE id=ANY($1::BIGINT[])',[ids]):[];
  const lookup=new Map(customers.map(c=>[String(c.id),c]));
- const support=await one(pool,"SELECT value FROM ib_settings WHERE key='support_phone'");
+ const support=await readSupportPhone(pool,id);
  const enriched=filtered.map(r=>({...r,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
- res.json({office,month:m,processed:!!batch,support_phone:support?.value||'01979900247',rows:enriched});
+ res.json({office,month:m,processed:!!batch,support_phone:support.value,rows:enriched});
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);

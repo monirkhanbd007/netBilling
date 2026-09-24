@@ -1,8 +1,9 @@
 import path from 'node:path';import {fileURLToPath} from 'node:url';
 import express from 'express';
-import {pool,one,tx} from './db.js';
-import {authenticate,signIn,signOut,onlySuper} from './auth.js';
+import {pool,one,tx,fail} from './db.js';
+import {authenticate,signIn,signOut,onlySuper,scope,requireOffice} from './auth.js';
 import {entities} from './entities.js';import {finance} from './finance.js';
+import {readSupportPhone,supportPhoneKey} from './support-phone.js';
 const app=express();app.disable('x-powered-by');app.set('trust proxy',1);app.use(express.json({limit:'1mb'}));
 app.use((req,res,next)=>{if(!['GET','HEAD','OPTIONS'].includes(req.method)){const origin=req.headers.origin;const allowed=process.env.APP_ORIGIN||'http://localhost:5173';if(origin&&origin!==allowed&&origin!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'Origin not allowed.'});}next();});
 app.get('/api/health',async(req,res)=>{await pool.query('SELECT 1');res.json({ok:true});});
@@ -15,8 +16,9 @@ app.get('/api/backup',async(req,res)=>{onlySuper(req.user);const tables=['ib_off
  const data=await tx(async db=>{await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');const output={format:'IBM_PG_V1',created_at:new Date().toISOString(),tables:[]};for(const name of tables)output.tables.push({key:name,rows:(await db.query(`SELECT * FROM ${name} ORDER BY ${name==='ib_settings'?'key':'id'}`)).rows});return output;});
  res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename="internet-business-backup-${new Date().toISOString().slice(0,10)}.json"`,'Cache-Control':'no-store'});res.send(JSON.stringify(data));
 });
-app.get('/api/settings',async(req,res)=>res.json(await one(pool,"SELECT value FROM ib_settings WHERE key='support_phone'")||{value:'01979900247'}));
-app.put('/api/settings',async(req,res)=>{onlySuper(req.user);const value=String(req.body?.support_phone||'').slice(0,50);await pool.query("INSERT INTO ib_settings(key,value) VALUES('support_phone',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",[JSON.stringify(value)]);res.json({value});});
+const settingsOffice=async(u,requested)=>{const id=requireOffice(u,scope(u,requested));if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(404,'Office not found.');return id;};
+app.get('/api/settings',async(req,res)=>{const officeId=await settingsOffice(req.user,req.query.office_id);res.json({office_id:officeId,...await readSupportPhone(pool,officeId)});});
+app.put('/api/settings',async(req,res)=>{onlySuper(req.user);const officeId=await settingsOffice(req.user,req.body?.office_id),value=String(req.body?.support_phone??'').trim();if(!value||value.length>50)fail(400,'Enter a support phone number of up to 50 characters.');await pool.query('INSERT INTO ib_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[supportPhoneKey(officeId),JSON.stringify(value)]);res.json({office_id:officeId,value,inherited:false});});
 app.use((err,req,res,next)=>{if(res.headersSent)return next(err);if(!err.status&&err.code!=='23505')console.error(err);res.status(err.status|| (err.code==='23505'?409:500)).json({error:err.status?err.message:err.code==='23505'?'A record with this identifier already exists.':'Server error.'});});
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))app.listen(Number(process.env.PORT)||3001,()=>console.log('Internet Business Manager API listening'));
 export default app;
