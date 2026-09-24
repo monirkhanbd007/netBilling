@@ -28,70 +28,59 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 - Node.js 20+ and PostgreSQL 14+.
 - A PostgreSQL database and a database user with permission to create tables.
 
-## Deploy from GitHub to Vercel
+## Deploy the frontend and backend separately on Vercel
 
-This repository includes `api/index.mjs` and `vercel.json` so Vercel serves the
-Vue build and runs the existing Express API on the **same domain**. The API
-still uses `DATABASE_URL`; Vercel does not run `npm start`, `npm run init`, or
-the import script during deployment. Deploying code does not erase Neon data.
+Create **two Vercel projects from this one GitHub repository**. The Vue project
+uses `client/` as its root; the Node.js/Express project uses `server/` as its
+root. PostgreSQL is hosted separately (for example, on Neon). Only the backend
+has database credentials. Browser requests go to the Vue project's `/api` path;
+its small proxy sends them to the backend, so login keeps using an HTTP-only
+cookie on the frontend domain.
 
-1. Create a Neon PostgreSQL database, or use the existing database if it
-   already contains this app's tables and users. Copy its **pooled** connection
-   string from Neon's Connect dialog (turn on Connection pooling). Keep the
-   connection string private; it is a database credential.
-2. Initialize an empty database **once** on your own machine. Set
-   `DATABASE_URL` to that Neon connection string, `BOOTSTRAP_USER` to a unique
-   administrator name, and `BOOTSTRAP_PASSWORD` to a unique password of at
-   least 12 characters. Then run, from the repository root:
+1. Prepare PostgreSQL. Create a Neon database or reuse the existing one if it
+   already contains this app's data. Copy its **pooled** connection string.
+   For an empty database, set `DATABASE_URL`, a unique `BOOTSTRAP_USER`, and a
+   `BOOTSTRAP_PASSWORD` of at least 12 characters on your computer. From the
+   repository root, run `npm ci` and `npm run init -w server` **once**. Skip
+   this step if `ib_users` already contains users. Do not put these credentials
+   in Git or in a `VITE_` variable.
+2. Push this repository to GitHub at `monirkhanbd007/ispbill`. In Vercel, select
+   **Add New → Project**, import that repository, and create the **backend**
+   project with **Root Directory: `server`** and **Framework Preset: Express**.
+   `server/vercel.json` runs `npm ci --workspaces=false`; Vercel detects `server/src/index.js` as
+   the Express entry point. Set `DATABASE_URL` to the pooled connection string
+   and `NODE_ENV=production` for Production before deploying. Do not set
+   `BOOTSTRAP_PASSWORD` in Vercel. Deploy, copy the backend's `https://...`
+   domain, and check `https://BACKEND-DOMAIN/api/health` for `{"ok":true}`.
+3. Create a second Vercel project from the **same repository** with **Root
+   Directory: `client`** and **Framework Preset: Vite**. `client/vercel.json`
+   runs `npm ci --workspaces=false --include=dev`, builds with
+   `npm run build --workspaces=false`, and publishes
+   `dist`. Set `BACKEND_URL` for Production to the backend's HTTPS origin,
+   for example `https://your-backend.vercel.app` (no `/api` suffix). Deploy
+   and copy the frontend's `https://...` domain. Set both projects to Node.js
+   **24.x** if Vercel asks for a version.
+4. In the **backend** project's Environment Variables, set `APP_ORIGIN` for
+   Production to the exact frontend origin, for example
+   `https://your-frontend.vercel.app` (no trailing slash). Redeploy the backend
+   so it picks up the new variable. Open the frontend site, sign in, and check
+   an office, customer, and known monthly bill. If sign-in returns 403, check
+   `APP_ORIGIN`; if the frontend returns 502, check its `BACKEND_URL` and the
+   backend function logs.
 
-   ```bash
-   npm ci
-   npm run init -w server
-   ```
-
-   `init` creates missing tables and adds the initial admin only when the
-   `ib_users` table has no users. If the database already has this app's users,
-   skip initialization. Do not import a WordPress backup into an occupied
-   database. Keep the connection string and bootstrap password out of Git and
-   out of any `VITE_` variable.
-3. Push this repository to GitHub. Its existing remote is
-   `https://github.com/monirkhanbd007/ispbill.git`; the Vercel project root is
-   the repository root (the folder containing `vercel.json`). If you have
-   local changes to publish, commit them and run `git push origin main`.
-4. In Vercel, choose **Add New → Project**, connect GitHub if prompted, and
-   import `monirkhanbd007/ispbill`. Keep **Root Directory** as `./` and use
-   **Framework Preset: Vite**. The checked-in `vercel.json` specifies
-   **Install Command: `npm ci --include=dev`**, **Build Command: `npm run build`**, and
-   **Output Directory: `client/dist`**. Use Node.js **24.x** in Vercel's
-   project settings if a version choice appears. Including dev dependencies
-   ensures Vite is installed even when `NODE_ENV=production` is set.
-5. Before clicking **Deploy**, open **Environment Variables** in the import
-   form. Add `DATABASE_URL` with the Neon pooled connection string for
-   **Production**. Add `NODE_ENV=production` for Production. Leave
-   `APP_ORIGIN` unset unless you need to restrict requests to a specific
-   production domain; same-origin requests work without it. Do not add
-   `BOOTSTRAP_PASSWORD` to Vercel. If the project has already been created,
-   add these under **Project → Settings → Environment Variables** and redeploy.
-6. Deploy. Open `https://YOUR-DOMAIN/api/health` (should return `{"ok":true}`),
-   then sign in and check an office, a customer, and one known monthly bill.
-   A working health check confirms DB connectivity, but sign-in also checks
-   that the expected schema and users exist. If the API returns 500, check
-   Vercel's function logs and the Neon connection string. If login returns
-   403, check `APP_ORIGIN` and the deployment URL, including `https`.
-
-**Preview deployments:** If you enable Preview, use a separate Neon
-branch/database and set its `DATABASE_URL` for Preview in Vercel. A preview
-connected to the live production database can write real records. If you later
-add a custom domain, update `APP_ORIGIN` to that domain if you set it.
-Environment-variable changes require a new deployment.
+**Preview deployments:** Use a separate Neon branch/database for backend
+Preview and set a Preview `DATABASE_URL` there. Point the frontend Preview
+`BACKEND_URL` to that backend Preview deployment, and set its `APP_ORIGIN` to
+the frontend Preview origin. A preview connected to the production database can
+write real billing records. Environment-variable changes require a redeploy.
 
 ### Publishing later changes
 
-Keep the same Git repository connected to the Vercel project. Edit the Vue
+Keep both Vercel projects connected to the same Git repository. Edit the Vue
 client, Express API, and/or SQL as needed, run `npm test` and `npm run build`,
-then commit and push. Vercel builds and publishes the new code automatically;
-the `DATABASE_URL` still points to the same Neon database, so existing data
-remains. Test changes in Preview with a separate Neon branch first.
+then commit and push. Vercel redeploys both projects automatically from `main`.
+The backend `DATABASE_URL` still points to the same Neon database, so existing
+data remains. Test changes in Preview with a separate Neon branch first.
 
 For new tables or columns, save a **versioned, reviewed SQL migration** and
 run it against a backed-up Neon database before deploying code that requires
@@ -118,7 +107,11 @@ npm run init -w server
 npm run dev
 ```
 
-Open `http://localhost:5173` and use `BOOTSTRAP_USER` / `BOOTSTRAP_PASSWORD`. For production, run `npm run build` followed by `npm start`; the Node.js server serves the built Vue app on `PORT` (default `3001`). Set `NODE_ENV=production`, `APP_ORIGIN=https://your-domain.example`, a strong database password, HTTPS, and secure database backups. The API and frontend should be served from one origin.
+Open `http://localhost:5173` and use `BOOTSTRAP_USER` / `BOOTSTRAP_PASSWORD`.
+Locally, Vite forwards `/api` to the Node.js server on port `3001`. For a
+non-Vercel production setup, host the built Vue `client/dist` files and the
+Node.js `server` process separately; route the frontend's `/api` path to the
+backend and set `APP_ORIGIN` to the frontend origin.
 
 The SQL schema is in `server/sql/001_schema.sql`. Initialization is safe to run again: it creates tables if missing and only creates an administrator when there are no users.
 

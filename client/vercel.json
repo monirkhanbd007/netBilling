@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci --workspaces=false --include=dev",
+  "buildCommand": "npm run build --workspaces=false",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index.mjs?__proxy_path=:path*" },
+    { "source": "/:path*", "destination": "/index.html" }
+  ]
+}

@@ -17,8 +17,6 @@ app.get('/api/backup',async(req,res)=>{onlySuper(req.user);const tables=['ib_off
 });
 app.get('/api/settings',async(req,res)=>res.json(await one(pool,"SELECT value FROM ib_settings WHERE key='support_phone'")||{value:'01979900247'}));
 app.put('/api/settings',async(req,res)=>{onlySuper(req.user);const value=String(req.body?.support_phone||'').slice(0,50);await pool.query("INSERT INTO ib_settings(key,value) VALUES('support_phone',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",[JSON.stringify(value)]);res.json({value});});
-const staticDir=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../client/dist');app.use(express.static(staticDir));
-app.get('/{*path}',(req,res,next)=>{if(req.path.startsWith('/api/'))return next();res.sendFile(path.join(staticDir,'index.html'),err=>{if(err)next(err);});});
 app.use((err,req,res,next)=>{if(res.headersSent)return next(err);if(!err.status&&err.code!=='23505')console.error(err);res.status(err.status|| (err.code==='23505'?409:500)).json({error:err.status?err.message:err.code==='23505'?'A record with this identifier already exists.':'Server error.'});});
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))app.listen(Number(process.env.PORT)||3001,()=>console.log('Internet Business Manager API listening'));
 export default app;
