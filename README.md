@@ -138,11 +138,18 @@ backend and set `APP_ORIGIN` to the frontend origin.
 ## Print bill slips
 
 In **Bill Slip**, choose the office and month, then select **Preview & Print
-A4**. The preview uses the office name, address, and payment phone from Office
-Management; customer and bill figures come from the database. Print on **A4
+A4**. The preview uses the office name and address from Office Management,
+payment and support numbers from that office's Settings, and customer and bill
+figures from the database. Print on **A4
 portrait** at **100% scale**. Each page contains four customer pairs: four office
 copies and four customer copies, with dashed cut guides. Customers whose total
-bill is zero are omitted. The support phone comes from the selected office's Settings.
+bill is zero are omitted.
+
+In **POS Bill Slip**, choose the office, month, and one customer, then select
+**Preview & Print POS Slip**. It opens a separate 80 mm thermal receipt preview.
+Select an **80 mm printer**, **100% scale**, **no margins**, and disable browser
+headers and footers. Each print contains one customer copy and uses the same
+database bill and office payment settings as the A4 slip.
 
 The SQL schema is in `backend/sql/001_schema.sql`. Initialization is safe to run again: it creates tables if missing and only creates an administrator when there are no users.
 

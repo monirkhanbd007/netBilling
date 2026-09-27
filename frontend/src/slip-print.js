@@ -1,13 +1,13 @@
-const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char]);
 
-const valueOrDash = value => escapeHtml(String(value ?? '').trim() || '—');
+export const valueOrDash = value => escapeHtml(String(value ?? '').trim() || '—');
 const bengaliNumber = value => new Intl.NumberFormat('bn-BD', { useGrouping: false }).format(value);
-const bengaliMoney = value => `৳${new Intl.NumberFormat('bn-BD', {
+export const bengaliMoney = value => `৳${new Intl.NumberFormat('bn-BD', {
   minimumFractionDigits: 2, maximumFractionDigits: 2
 }).format(Number(value || 0))}`;
-const bengaliMonth = month => new Intl.DateTimeFormat('bn-BD', {
+export const bengaliMonth = month => new Intl.DateTimeFormat('bn-BD', {
   month: 'long', year: 'numeric', timeZone: 'UTC'
 }).format(new Date(`${month}-01T00:00:00Z`));
 
