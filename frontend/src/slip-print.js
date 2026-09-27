@@ -40,7 +40,7 @@ function slipCard(slips, row, index, count, copy) {
       <div class="total"><span>মোট বিল</span><strong>${bengaliMoney(row.total_due)}</strong></div>
     </div>
     <div class="settlement"><span>পরিশোধিত <b>${bengaliMoney(row.paid_amount)}</b></span><span>বাকি <b>${bengaliMoney(row.balance_due)}</b></span></div>
-    <footer class="footer"><div class="payment-numbers">${payment}</div><div class="footer-bottom"><span><b>সহায়তা:</b> ${valueOrDash(slips.support_phone)}</span><small class="signature">আদায়কারীর স্বাক্ষর</small></div></footer>
+    <footer class="footer"><div class="payment-numbers">${payment}</div><div class="footer-bottom"><span><b>Support 24/7 Person:</b> ${valueOrDash(slips.support_phone)}</span><small class="signature">আদায়কারীর স্বাক্ষর</small></div></footer>
   </article>`;
 }
 
