@@ -35,6 +35,7 @@ test('A4 slips render four customer pairs per page from escaped database fields'
   assert.doesNotMatch(html,/01713818085/);
   assert.match(html,/01979900247/);
   assert.match(html,/Support 24\/7 Person:<\/b> 01979900247/);
+  assert.doesNotMatch(html,/পরিশোধিত|বাকি/);
   assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html,/<script>alert\(1\)<\/script>/);
 });
