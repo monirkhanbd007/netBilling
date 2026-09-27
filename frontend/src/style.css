@@ -17,10 +17,14 @@
 .signout{grid-column:1/-1;width:100%;margin:0;border:1px solid #ffffff2b;border-radius:8px;background:#ffffff12;color:#d7e7e9;font-size:12px;font-weight:800;padding:8px 10px;display:flex;align-items:center;justify-content:space-between}
 .signout:hover{background:#ffffff22;color:#fff}
 .signout span{font-size:18px;line-height:1}
-.report-table th,.report-table td{padding:11px 9px}
+.report-panel .panel-head h2,.report-panel .panel-head .muted{color:#000}
+.report-table th,.report-table td{padding:11px 9px;color:#000;border:1px solid #a5adb1}
+.report-table td strong,.report-table .tag{color:#000}
+.report-table thead th{background:#eef1f2}
+.report-table tbody tr:nth-child(even){background:#f7f8f8}
 .report-table .number{text-align:right;font-variant-numeric:tabular-nums}
-.report-table tfoot th{background:#eaf5f4;color:#184e50;border-top:2px solid #158f89;font-size:11px}
+.report-table tfoot th{background:#e5e9ea;color:#000;border-top:2px solid #000;font-size:11px}
 .report-table tfoot th:first-child{text-align:left}
-.report-table .tag.pending{background:#fff0de;color:#9f701e}
+.report-table .tag.pending{background:#fff0de;color:#000}
 @page{size:A4 landscape;margin:8mm}
-@media print{.report-panel .panel-head{padding:0 0 8px}.report-panel .report-grid{display:none}.report-table{table-layout:fixed;white-space:normal}.report-table th,.report-table td{padding:4px 3px;font-size:8px;overflow-wrap:anywhere}.report-table .tag{padding:2px 3px;font-size:8px}.report-table tr{break-inside:avoid}.report-table thead{display:table-header-group}}
+@media print{.report-panel .panel-head{padding:0 0 8px}.report-panel .report-grid{display:none}.report-panel .table-wrap{overflow:visible}.report-table{table-layout:fixed;white-space:normal;-webkit-print-color-adjust:exact;print-color-adjust:exact}.report-table th,.report-table td{padding:3px;font-size:9.5px;overflow-wrap:anywhere}.report-table .tag{padding:2px 3px;font-size:9px}.report-table tr{break-inside:avoid}.report-table thead{display:table-header-group}.report-table thead th:nth-child(1){width:4%}.report-table thead th:nth-child(2){width:8%}.report-table thead th:nth-child(3){width:14%}.report-table thead th:nth-child(4),.report-table thead th:nth-child(5){width:9%}.report-table thead th:nth-child(6){width:10%}.report-table thead th:nth-child(n+7):nth-child(-n+11){width:8%}.report-table thead th:nth-child(12){width:6%}}
