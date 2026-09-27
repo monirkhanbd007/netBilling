@@ -35,7 +35,7 @@ export function buildPosSlipHtml(slips, recordedPayment=null) {
     .detail,.amount,.payment-row{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;padding:1mm 0;border-bottom:1px dotted #777;line-height:1.25}
     .detail span,.amount span,.payment-row span{flex:none;font-size:8pt}.detail strong,.amount strong,.payment-row strong{text-align:right;font-size:9pt;font-weight:700;overflow-wrap:anywhere;min-width:0}
     .amounts{margin-top:2mm}.amount.total{border-top:1px solid #000;border-bottom:2px solid #000;padding:1.7mm 0}.amount.total span,.amount.total strong,.amount.paid span,.amount.paid strong{font-size:11pt;font-weight:800}.amount.paid{border-bottom:2px solid #000}
-    .section-label{font-weight:800;font-size:9pt;margin:3mm 0 1mm}.payment-row:last-child{border-bottom:0}.support{margin-top:3mm;font-size:8pt;line-height:1.3;overflow-wrap:anywhere}.signature{margin:7mm 0 0 32mm;border-top:1px dotted #000;padding-top:1mm;text-align:center;font-size:8pt}
+    .section-label{font-weight:800;font-size:9pt;margin:3mm 0 1mm}.payment-row{justify-content:flex-start}.payment-row span{min-width:15mm}.payment-row strong{text-align:left}.payment-row:last-child{border-bottom:0}.support{margin-top:3mm;font-size:8pt;line-height:1.3;overflow-wrap:anywhere}.signature{margin:7mm 0 0 32mm;border-top:1px dotted #000;padding-top:1mm;text-align:center;font-size:8pt}
     .thank-you{text-align:center;font-size:8pt;margin:4mm 0 0}
     @media print{html{background:#fff}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none}.receipt{width:80mm;margin:0;padding:4mm;box-shadow:none}}
   </style><style id="page-size"></style></head><body>
