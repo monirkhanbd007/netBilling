@@ -17,3 +17,10 @@
 .signout{grid-column:1/-1;width:100%;margin:0;border:1px solid #ffffff2b;border-radius:8px;background:#ffffff12;color:#d7e7e9;font-size:12px;font-weight:800;padding:8px 10px;display:flex;align-items:center;justify-content:space-between}
 .signout:hover{background:#ffffff22;color:#fff}
 .signout span{font-size:18px;line-height:1}
+.report-table th,.report-table td{padding:11px 9px}
+.report-table .number{text-align:right;font-variant-numeric:tabular-nums}
+.report-table tfoot th{background:#eaf5f4;color:#184e50;border-top:2px solid #158f89;font-size:11px}
+.report-table tfoot th:first-child{text-align:left}
+.report-table .tag.pending{background:#fff0de;color:#9f701e}
+@page{size:A4 landscape;margin:8mm}
+@media print{.report-panel .panel-head{padding:0 0 8px}.report-panel .report-grid{display:none}.report-table{table-layout:fixed;white-space:normal}.report-table th,.report-table td{padding:4px 3px;font-size:8px;overflow-wrap:anywhere}.report-table .tag{padding:2px 3px;font-size:8px}.report-table tr{break-inside:avoid}.report-table thead{display:table-header-group}}
