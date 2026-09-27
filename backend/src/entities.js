@@ -16,6 +16,8 @@ const definitions={
 };
 const errorIfMissing=(v,label)=>{if(v===undefined||v===null||String(v).trim()==='')fail(400,`${label} is required.`);};
 const knownOffice=async(id)=>{if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(400,'Office does not exist.');};
+const expenseTypeKey=id=>`expense_types_office_${id}`;
+const normalizedExpenseType=value=>{const type=String(value??'').trim();if(!type||type.length>100)fail(400,'Enter an expense type of up to 100 characters.');return type;};
 async function accessRecord(db,u,def,id){
   const record=await one(db,`SELECT * FROM ${def.table} WHERE id=$1`,[id]);if(!record)fail(404,'Record not found.');
   if(def.global){if(!superAdmin(u)&&Number(record.id)!==Number(u.office_id))fail(403,'Office access denied.');}
@@ -26,8 +28,23 @@ async function accessRecord(db,u,def,id){
 export const entities=Router();
 entities.get('/expense-types',async(req,res)=>{
   const officeId=requireOffice(req.user,scope(req.user,req.query.office_id));
-  const rows=await all(pool,"SELECT DISTINCT BTRIM(expense_type) AS expense_type FROM ib_office_expenses WHERE office_id=$1 AND BTRIM(expense_type)<>'' ORDER BY expense_type LIMIT 100",[officeId]);
-  res.json(rows.map(row=>row.expense_type));
+  const [saved,rows]=await Promise.all([
+    one(pool,'SELECT value FROM ib_settings WHERE key=$1',[expenseTypeKey(officeId)]),
+    all(pool,"SELECT DISTINCT BTRIM(expense_type) AS expense_type FROM ib_office_expenses WHERE office_id=$1 AND BTRIM(expense_type)<>'' ORDER BY expense_type LIMIT 100",[officeId])
+  ]);
+  const seen=new Set(),types=[];
+  for(const value of [...(Array.isArray(saved?.value)?saved.value:[]),...rows.map(row=>row.expense_type)]){
+    const type=String(value??'').trim(),key=type.toLocaleLowerCase();
+    if(type&&!seen.has(key)){seen.add(key);types.push(type);}
+  }
+  res.json(types.sort((a,b)=>a.localeCompare(b)).slice(0,100));
+});
+entities.post('/expense-types',async(req,res)=>{
+  const officeId=requireOffice(req.user,scope(req.user,req.body?.office_id));
+  await knownOffice(officeId);
+  const type=normalizedExpenseType(req.body?.expense_type);
+  await pool.query("INSERT INTO ib_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN jsonb_typeof(ib_settings.value)='array' THEN ib_settings.value || EXCLUDED.value ELSE EXCLUDED.value END",[expenseTypeKey(officeId),JSON.stringify([type])]);
+  res.status(201).json({expense_type:type});
 });
 entities.get('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user;
@@ -51,7 +68,7 @@ entities.post('/:name',async(req,res)=>{
   if(def.global)onlySuper(u);
   let data={};for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
   if(!def.global&&!def.append&&!(req.params.name==='users'&&b.role==='Super Admin')){data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
-  if(Object.hasOwn(data,'expense_type')){data.expense_type=String(data.expense_type??'').trim();if(data.expense_type.length>100)fail(400,'Expense type must be 100 characters or fewer.');}
+  if(Object.hasOwn(data,'expense_type'))data.expense_type=normalizedExpenseType(data.expense_type);
   for(const key of def.required||[])errorIfMissing(data[key],key);
   for(const key of def.money||[])if(data[key]!=null)data[key]=(money(data[key])/100).toFixed(2);
   for(const key of def.dates||[])if(data[key])data[key]=date(data[key]);else if(data[key]==='')data[key]=null;
@@ -81,7 +98,7 @@ entities.put('/:name/:id',async(req,res)=>{
   const old=await accessRecord(pool,u,def,req.params.id),b=req.body||{},data={};
   for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
   if(!def.global&&!(req.params.name==='users'&&(data.role??old.role)==='Super Admin')){const office=scope(u,data.office_id??old.office_id);requireOffice(u,office);await knownOffice(office);data.office_id=office;}
-  if(Object.hasOwn(data,'expense_type')){data.expense_type=String(data.expense_type??'').trim();if(data.expense_type.length>100)fail(400,'Expense type must be 100 characters or fewer.');}
+  if(Object.hasOwn(data,'expense_type'))data.expense_type=normalizedExpenseType(data.expense_type);
   for(const key of def.required||[])if(Object.hasOwn(data,key))errorIfMissing(data[key],key);
   for(const key of def.money||[])if(Object.hasOwn(data,key))data[key]=(money(data[key])/100).toFixed(2);
   for(const key of def.dates||[])if(Object.hasOwn(data,key))data[key]=data[key]?date(data[key]):null;

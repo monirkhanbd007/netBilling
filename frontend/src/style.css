@@ -4,8 +4,16 @@
 @media print{.sidebar,.topbar,.heading-controls,.button-group,.alert,.notice{display:none!important}.content{padding:0}.panel{border:0;box-shadow:none}.work{width:100%}body{background:white}.report-panel{display:block}td,th{padding:7px;font-size:9px}}
 .metric-placeholder{min-height:122px}.placeholder-line{display:block;height:12px;border-radius:999px;background:#e8eff2;animation:placeholder-pulse 1.5s ease-in-out infinite}.placeholder-line.short{width:44%}.placeholder-line.medium{width:55%}.placeholder-line.value{width:65%;height:28px;margin:18px 0 12px}.placeholder-line.wide{width:100%;margin-top:20px}.dashboard-placeholder{padding:24px}@keyframes placeholder-pulse{50%{opacity:.48}}@media(prefers-reduced-motion:reduce){.placeholder-line{animation:none}}
 .month-name{color:#247f82;font-size:11px;font-weight:800;letter-spacing:.01em}
-.expense-type-options{display:flex;flex-wrap:wrap;gap:6px;max-height:100px;overflow:auto}
-.expense-type-options button{border:1px solid #cbdfe0;border-radius:999px;background:#f4faf9;color:#286865;padding:5px 9px;font-size:11px;font-weight:700}
-.expense-type-options button:hover,.expense-type-options button.selected{background:#d9f2ef;border-color:#15a29a}
+.expense-add-toggle{align-self:flex-start;border:0;background:none;color:#0b8581;padding:2px 0;font-size:11px;font-weight:800}
+.expense-add-toggle:hover{text-decoration:underline}
+.expense-add-row{display:flex;align-items:center;gap:8px;width:100%}
+.expense-add-row input{min-width:0;flex:1}
+.expense-add-row button{white-space:nowrap}
 .modal-alert{margin:15px 23px 0}
 .form-hint{color:#80919d;font-size:11px;font-weight:600}
+.side-account{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;padding:14px 12px}
+.side-account>div{min-width:0}
+.side-account b{max-width:none}
+.signout{grid-column:1/-1;width:100%;margin:0;border:1px solid #ffffff2b;border-radius:8px;background:#ffffff12;color:#d7e7e9;font-size:12px;font-weight:800;padding:8px 10px;display:flex;align-items:center;justify-content:space-between}
+.signout:hover{background:#ffffff22;color:#fff}
+.signout span{font-size:18px;line-height:1}
