@@ -20,7 +20,7 @@ async function showPosSlip() {
   document.getElementById('print-button').addEventListener('click',()=>window.print());
   const returnToPicker=clear=>{
     if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'pos-return',clear},window.location.origin);window.opener.focus();window.close();}
-    else window.location.assign('/?page=pos-slips');
+    else {const picker=new URLSearchParams({page:'pos-slips',office_id:officeId,month});if(!clear)picker.set('customer_db_id',customerId);window.location.assign(`/?${picker}`);}
   };
   document.getElementById('back-button').addEventListener('click',()=>returnToPicker(false));
   document.getElementById('search-button').addEventListener('click',()=>returnToPicker(true));

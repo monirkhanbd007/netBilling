@@ -75,6 +75,7 @@ export function buildSlipPrintHtml(slips) {
     .footer{display:flex;flex-direction:column;gap:1mm;margin-top:auto;font-size:6.3pt;line-height:1.1}.footer b{color:#42616b}.payment-numbers{display:flex;justify-content:space-between;gap:1mm;flex-wrap:wrap}.payment-numbers span{white-space:nowrap}.footer-bottom{display:flex;align-items:end;justify-content:space-between;gap:1mm}.footer small{color:#6e8790;font-size:5.8pt}.signature{border-top:1px dotted #91a7ad;text-align:center;padding-top:.5mm;min-width:23mm}
     .slip,.slip *{color:#000!important}
     @page{size:A4 portrait;margin:5mm}
+    @media screen and (max-width:600px){.toolbar{flex-wrap:wrap;padding:10px 12px}.toolbar-actions{width:100%}.toolbar button{flex:1;min-height:44px;padding:9px 10px}.page{margin:12px 0 12px 12px}}
     @media print{html{background:white}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none}.page{width:200mm;height:287mm;margin:0 auto;box-shadow:none}}
   </style></head><body><div class="toolbar"><span>এ৪ পোর্ট্রেট · প্রতি পাতায় ৮ কপি (৪ অফিস + ৪ গ্রাহক) · কাটার দাগ অনুসরণ করুন</span><div class="toolbar-actions"><button type="button" id="back-button">← অ্যাপে ফিরে যান</button><button type="button" id="print-button">প্রিন্ট / PDF সংরক্ষণ</button></div></div>${sheets.join('')}</body></html>`;
 }
