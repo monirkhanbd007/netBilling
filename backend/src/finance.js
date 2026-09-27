@@ -68,6 +68,13 @@ finance.get('/payments',async(req,res)=>{
  if(req.query.date){params.push(date(req.query.date));filters.push(`payment_date=$${params.length}`);}
  res.json(await all(pool,`SELECT * FROM ib_payments ${filters.length?'WHERE '+filters.join(' AND '):''} ORDER BY id DESC LIMIT 2000`,params));
 });
+finance.get('/payments/:id',async(req,res)=>{
+ if(!/^\d+$/.test(req.params.id))fail(400,'Invalid payment ID.');
+ const payment=await one(pool,'SELECT * FROM ib_payments WHERE id=$1',[req.params.id]);
+ if(!payment)fail(404,'Payment not found.');
+ requireOffice(req.user,payment.office_id);
+ res.json(payment);
+});
 finance.post('/payments',async(req,res)=>{
  const u=req.user,b=req.body,id=officeOf(u,b.office_id),m=selectedMonth(b.month),paymentDate=date(b.payment_date||today()),amount=money(b.amount);
  if(amount<=0)fail(400,'Payment amount must be greater than zero.');

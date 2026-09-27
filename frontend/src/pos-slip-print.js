@@ -1,9 +1,15 @@
 import {bengaliMoney,bengaliMonth,escapeHtml,valueOrDash,printableSlipRows} from './slip-print.js';
 
-export function buildPosSlipHtml(slips) {
+const bengaliDate=value=>{
+  const date=String(value||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)?new Intl.DateTimeFormat('bn-BD',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
+};
+
+export function buildPosSlipHtml(slips, recordedPayment=null) {
   const rows=printableSlipRows(slips);
   if(rows.length!==1)throw Error('Select one billable customer for POS printing.');
   const row=rows[0],office=slips.office||{};
+  if(recordedPayment&&(Number(recordedPayment.office_id)!==Number(office.id)||Number(recordedPayment.customer_db_id)!==Number(row.customer_db_id)||recordedPayment.bill_month!==slips.month||!Number.isFinite(Number(recordedPayment.amount))||Number(recordedPayment.amount)<=0))throw Error('Payment does not match this bill slip.');
   const details=[
     ['গ্রাহকের নাম',row.customer_name],
     ['গ্রাহক আইডি',row.customer_id],
@@ -17,6 +23,7 @@ export function buildPosSlipHtml(slips) {
   const payment=paymentMethods.length
     ? paymentMethods.map(([label,number])=>`<div class="payment-row"><span>${label}</span><strong>${valueOrDash(number)}</strong></div>`).join('')
     : `<div class="payment-row"><span>বিল পরিশোধ</span><strong>${valueOrDash(office.phone)}</strong></div>`;
+  const receipt=recordedPayment?`<hr class="rule"><h3 class="section-label">পেমেন্ট রসিদ</h3><div class="amount paid"><span>পরিশোধিত টাকা</span><strong>${bengaliMoney(recordedPayment.amount)}</strong></div><div class="detail"><span>রসিদ নম্বর</span><strong>${valueOrDash(recordedPayment.receipt_no)}</strong></div><div class="detail"><span>তারিখ</span><strong>${bengaliDate(recordedPayment.payment_date)}</strong></div><div class="detail"><span>মাধ্যম</span><strong>${valueOrDash(recordedPayment.payment_method)}</strong></div>`:'';
   return `<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>POS বিল স্লিপ · ${valueOrDash(office.office_name)} · ${valueOrDash(row.customer_id)}</title>
   <style>
     *{box-sizing:border-box}html{background:#e8edef}body{margin:0;color:#000;font-family:'Noto Sans Bengali','Nirmala UI','Vrinda',sans-serif;font-size:10pt}
@@ -27,15 +34,15 @@ export function buildPosSlipHtml(slips) {
     .rule{border:0;border-top:1px dashed #000;margin:3mm 0}.receipt-title{text-align:center;font-weight:800;font-size:12pt;margin:0}.month{text-align:center;font-size:9pt;margin:1mm 0 0}
     .detail,.amount,.payment-row{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;padding:1mm 0;border-bottom:1px dotted #777;line-height:1.25}
     .detail span,.amount span,.payment-row span{flex:none;font-size:8pt}.detail strong,.amount strong,.payment-row strong{text-align:right;font-size:9pt;font-weight:700;overflow-wrap:anywhere;min-width:0}
-    .amounts{margin-top:2mm}.amount.total{border-top:1px solid #000;border-bottom:2px solid #000;padding:1.7mm 0}.amount.total span,.amount.total strong{font-size:11pt;font-weight:800}
+    .amounts{margin-top:2mm}.amount.total{border-top:1px solid #000;border-bottom:2px solid #000;padding:1.7mm 0}.amount.total span,.amount.total strong,.amount.paid span,.amount.paid strong{font-size:11pt;font-weight:800}.amount.paid{border-bottom:2px solid #000}
     .section-label{font-weight:800;font-size:9pt;margin:3mm 0 1mm}.payment-row:last-child{border-bottom:0}.support{margin-top:3mm;font-size:8pt;line-height:1.3;overflow-wrap:anywhere}.signature{margin:7mm 0 0 32mm;border-top:1px dotted #000;padding-top:1mm;text-align:center;font-size:8pt}
     .thank-you{text-align:center;font-size:8pt;margin:4mm 0 0}
     @media print{html{background:#fff}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none}.receipt{width:80mm;margin:0;padding:4mm;box-shadow:none}}
   </style><style id="page-size"></style></head><body>
-    <div class="toolbar"><span>৮০ মিমি POS বিল স্লিপ · 80 mm কাগজ, কোনো মার্জিন বা হেডার/ফুটার নয়</span><div class="toolbar-actions"><button type="button" id="back-button">← Back</button><button type="button" id="search-button">Search New Customer</button><button type="button" id="print-button">POS প্রিন্ট</button></div></div>
+    <div class="toolbar"><span>৮০ মিমি POS বিল স্লিপ · 80 mm কাগজ, কোনো মার্জিন বা হেডার/ফুটার নয়</span><div class="toolbar-actions"><button type="button" id="back-button">← Back</button><button type="button" id="search-button">Search New Bill Slip</button><button type="button" id="print-button">POS প্রিন্ট</button></div></div>
     <article class="receipt"><header class="office"><h1>${valueOrDash(office.office_name)}</h1><p>${valueOrDash(office.address)}</p></header>
       <hr class="rule"><h2 class="receipt-title">ইন্টারনেট বিল স্লিপ</h2><p class="month">${escapeHtml(bengaliMonth(slips.month))} · গ্রাহক কপি</p><hr class="rule">
-      <div class="details">${details}</div><div class="amounts"><div class="amount"><span>মাসিক বিল</span><strong>${bengaliMoney(row.monthly_bill)}</strong></div><div class="amount"><span>আগের বকেয়া</span><strong>${bengaliMoney(row.previous_due)}</strong></div><div class="amount total"><span>মোট বিল</span><strong>${bengaliMoney(row.total_due)}</strong></div></div>
+      <div class="details">${details}</div><div class="amounts"><div class="amount"><span>মাসিক বিল</span><strong>${bengaliMoney(row.monthly_bill)}</strong></div><div class="amount"><span>আগের বকেয়া</span><strong>${bengaliMoney(row.previous_due)}</strong></div><div class="amount total"><span>মোট বিল</span><strong>${bengaliMoney(row.total_due)}</strong></div></div>${receipt}
       <p class="section-label">বিল পরিশোধের নম্বর</p><div class="payment-methods">${payment}</div><p class="support"><b>Support 24/7 Person:</b> ${valueOrDash(slips.support_phone)}</p><div class="signature">আদায়কারীর স্বাক্ষর</div><p class="thank-you">ইন্টারনেট সেবা ব্যবহারের জন্য ধন্যবাদ</p>
     </article></body></html>`;
 }
