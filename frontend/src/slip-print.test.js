@@ -7,6 +7,7 @@ test('A4 slips render four customer pairs per page from escaped database fields'
     month: '2026-09',
     office: {office_name:'GNS-2',address:'Ansar Academy, Shafipur',phone:'01713818085'},
     support_phone:'01979900247',
+    payment_numbers:{bkash:'01711111111',nagad:'01822222222',rocket:'<01933333333>'},
     rows:[
       {customer_id:'ibn05',customer_name:'Abdul Jalil',monthly_bill:'600.00',previous_due:'600.00',total_due:'1200.00',paid_amount:'0.00',balance_due:'1200.00'},
       {customer_id:'test',customer_name:'No bill',total_due:'0.00'},
@@ -28,8 +29,17 @@ test('A4 slips render four customer pairs per page from escaped database fields'
   assert.match(html,/অফিস কপি/);
   assert.match(html,/গ্রাহক কপি/);
   assert.match(html,/সেপ্টেম্বর ২০২৬/);
-  assert.match(html,/01713818085/);
+  assert.match(html,/বিকাশ:<\/b> 01711111111/);
+  assert.match(html,/নগদ:<\/b> 01822222222/);
+  assert.match(html,/রকেট:<\/b> &lt;01933333333&gt;/);
+  assert.doesNotMatch(html,/01713818085/);
   assert.match(html,/01979900247/);
   assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html,/<script>alert\(1\)<\/script>/);
+});
+
+test('slips without configured payment numbers show the office phone', () => {
+  const html=buildSlipPrintHtml({month:'2026-09',office:{phone:'01713818085'},support_phone:'01979900247',rows:[{total_due:'1.00'}]});
+  assert.match(html,/বিল পরিশোধ:<\/b> 01713818085/);
+  assert.doesNotMatch(html,/বিকাশ:<\/b>/);
 });

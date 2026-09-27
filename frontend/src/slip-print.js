@@ -17,6 +17,11 @@ function slipCard(slips, row, index, count, copy) {
   const office = slips.office || {};
   const serial = `${bengaliNumber(index + 1).padStart(2, '০')} / ${bengaliNumber(count)}`;
   const detail = (label, value, wide = false) => `<div class="detail${wide ? ' wide' : ''}"><dt>${label}</dt><dd>${valueOrDash(value)}</dd></div>`;
+  const methods = [['বিকাশ', slips.payment_numbers?.bkash], ['নগদ', slips.payment_numbers?.nagad], ['রকেট', slips.payment_numbers?.rocket]]
+    .filter(([, number]) => String(number ?? '').trim());
+  const payment = methods.length
+    ? methods.map(([label, number]) => `<span><b>${label}:</b> ${valueOrDash(number)}</span>`).join('')
+    : `<span><b>বিল পরিশোধ:</b> ${valueOrDash(office.phone)}</span>`;
   return `<article class="slip">
     <div class="slip-top"><span class="copy-name">${copy}</span><span class="slip-number">বিল স্লিপ নং ${serial}</span></div>
     <header class="office"><h1>${valueOrDash(office.office_name)}</h1><p>${valueOrDash(office.address)}</p></header>
@@ -35,7 +40,7 @@ function slipCard(slips, row, index, count, copy) {
       <div class="total"><span>মোট বিল</span><strong>${bengaliMoney(row.total_due)}</strong></div>
     </div>
     <div class="settlement"><span>পরিশোধিত <b>${bengaliMoney(row.paid_amount)}</b></span><span>বাকি <b>${bengaliMoney(row.balance_due)}</b></span></div>
-    <footer class="footer"><div><b>বিল পরিশোধ:</b> ${valueOrDash(office.phone)} <small>বিকাশ · নগদ · রকেট</small></div><div><b>সহায়তা:</b> ${valueOrDash(slips.support_phone)} <small class="signature">আদায়কারীর স্বাক্ষর</small></div></footer>
+    <footer class="footer"><div class="payment-numbers">${payment}</div><div class="footer-bottom"><span><b>সহায়তা:</b> ${valueOrDash(slips.support_phone)}</span><small class="signature">আদায়কারীর স্বাক্ষর</small></div></footer>
   </article>`;
 }
 
@@ -69,7 +74,7 @@ export function buildSlipPrintHtml(slips) {
     .details{display:grid;grid-template-columns:1fr 1fr;column-gap:1.5mm;row-gap:.5mm;margin:0}.detail{min-width:0;display:flex;align-items:baseline;gap:.7mm;border-bottom:1px solid #e0e9ec;padding:0 0 .5mm;line-height:1.08}.detail.wide{grid-column:1/-1}.detail dt{flex:none;color:#5e7780;font-size:6pt}.detail dd{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:7.2pt}
     .amounts{display:grid;grid-template-columns:1fr 1fr 1.13fr;gap:.7mm}.amounts>div{border:1px solid #dae7e8;border-radius:3px;padding:1mm .8mm;min-width:0}.amounts .total{border-color:#158f89;background:#eff8f6}.amounts span{display:block;color:#5e7880;font-size:5.8pt;line-height:1}.amounts strong{display:block;margin-top:.5mm;color:#173943;font-size:9pt;line-height:1.12}.amounts .total strong{color:#087a75}
     .settlement{display:flex;justify-content:space-between;align-items:center;gap:2mm;border-bottom:1px solid #d5e3e6;padding-bottom:.6mm;color:#58717a;font-size:6.5pt;line-height:1}.settlement b{color:#163b48;font-size:7.5pt}.settlement span:last-child b{color:#b45332}
-    .footer{display:flex;justify-content:space-between;gap:1mm;margin-top:auto;font-size:6.3pt;line-height:1.1}.footer>div{min-width:0}.footer b{color:#42616b}.footer small{display:block;color:#6e8790;font-size:5.8pt;margin-top:.5mm}.signature{border-top:1px dotted #91a7ad;text-align:center;padding-top:.5mm}
+    .footer{display:flex;flex-direction:column;gap:1mm;margin-top:auto;font-size:6.3pt;line-height:1.1}.footer b{color:#42616b}.payment-numbers{display:flex;justify-content:space-between;gap:1mm;flex-wrap:wrap}.payment-numbers span{white-space:nowrap}.footer-bottom{display:flex;align-items:end;justify-content:space-between;gap:1mm}.footer small{color:#6e8790;font-size:5.8pt}.signature{border-top:1px dotted #91a7ad;text-align:center;padding-top:.5mm;min-width:23mm}
     @page{size:A4 portrait;margin:5mm}
     @media print{html{background:white}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none}.page{width:200mm;height:287mm;margin:0 auto;box-shadow:none}}
   </style></head><body><div class="toolbar"><span>এ৪ পোর্ট্রেট · প্রতি পাতায় ৮ কপি (৪ অফিস + ৪ গ্রাহক) · কাটার দাগ অনুসরণ করুন</span><div class="toolbar-actions"><button type="button" id="back-button">← অ্যাপে ফিরে যান</button><button type="button" id="print-button">প্রিন্ট / PDF সংরক্ষণ</button></div></div>${sheets.join('')}</body></html>`;
