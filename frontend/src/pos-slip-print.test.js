@@ -13,6 +13,8 @@ test('80 mm POS slip prints one escaped customer bill without settlement amounts
   assert.match(html,/01711111111/);
   assert.match(html,/01822222222/);
   assert.match(html,/Support 24\/7 Person:<\/b> 01979900247/);
+  assert.match(html,/id="back-button"[^>]*>← Back/);
+  assert.match(html,/id="search-button"[^>]*>Search New Customer/);
   assert.doesNotMatch(html,/পরিশোধিত|<span>বাকি<\/span>|01700000000/);
 });
 

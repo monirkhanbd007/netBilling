@@ -20,7 +20,7 @@ export function buildPosSlipHtml(slips) {
   return `<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>POS বিল স্লিপ · ${valueOrDash(office.office_name)} · ${valueOrDash(row.customer_id)}</title>
   <style>
     *{box-sizing:border-box}html{background:#e8edef}body{margin:0;color:#000;font-family:'Noto Sans Bengali','Nirmala UI','Vrinda',sans-serif;font-size:10pt}
-    .toolbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#102d3b;color:#fff;font:13px Arial,sans-serif}
+    .toolbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 20px;background:#102d3b;color:#fff;font:13px Arial,sans-serif}
     .toolbar-actions{display:flex;gap:8px}.toolbar button{border:0;border-radius:8px;padding:10px 15px;background:#139d98;color:#fff;font:700 13px Arial,sans-serif;cursor:pointer}.toolbar #back-button{background:#ffffff22}
     .receipt{width:80mm;margin:22px auto;padding:4mm;background:#fff;box-shadow:0 7px 28px #1234;color:#000}
     .receipt *{color:#000}.office{text-align:center}.office h1{font-size:16pt;line-height:1.2;margin:0;overflow-wrap:anywhere}.office p{font-size:8pt;line-height:1.35;margin:1.5mm 0 0;overflow-wrap:anywhere}
@@ -32,7 +32,7 @@ export function buildPosSlipHtml(slips) {
     .thank-you{text-align:center;font-size:8pt;margin:4mm 0 0}
     @media print{html{background:#fff}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none}.receipt{width:80mm;margin:0;padding:4mm;box-shadow:none}}
   </style><style id="page-size"></style></head><body>
-    <div class="toolbar"><span>৮০ মিমি POS বিল স্লিপ · 80 mm কাগজ, কোনো মার্জিন বা হেডার/ফুটার নয়</span><div class="toolbar-actions"><button type="button" id="back-button">বন্ধ করুন</button><button type="button" id="print-button">POS প্রিন্ট</button></div></div>
+    <div class="toolbar"><span>৮০ মিমি POS বিল স্লিপ · 80 mm কাগজ, কোনো মার্জিন বা হেডার/ফুটার নয়</span><div class="toolbar-actions"><button type="button" id="back-button">← Back</button><button type="button" id="search-button">Search New Customer</button><button type="button" id="print-button">POS প্রিন্ট</button></div></div>
     <article class="receipt"><header class="office"><h1>${valueOrDash(office.office_name)}</h1><p>${valueOrDash(office.address)}</p></header>
       <hr class="rule"><h2 class="receipt-title">ইন্টারনেট বিল স্লিপ</h2><p class="month">${escapeHtml(bengaliMonth(slips.month))} · গ্রাহক কপি</p><hr class="rule">
       <div class="details">${details}</div><div class="amounts"><div class="amount"><span>মাসিক বিল</span><strong>${bengaliMoney(row.monthly_bill)}</strong></div><div class="amount"><span>আগের বকেয়া</span><strong>${bengaliMoney(row.previous_due)}</strong></div><div class="amount total"><span>মোট বিল</span><strong>${bengaliMoney(row.total_due)}</strong></div></div>

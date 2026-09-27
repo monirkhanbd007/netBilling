@@ -15,7 +15,12 @@ async function showPosSlip() {
   const heightMm=Math.ceil(receipt.getBoundingClientRect().height/(96/25.4))+2;
   document.getElementById('page-size').textContent=`@page{size:80mm ${Math.max(heightMm,70)}mm;margin:0}`;
   document.getElementById('print-button').addEventListener('click',()=>window.print());
-  document.getElementById('back-button').addEventListener('click',()=>window.close());
+  const returnToPicker=clear=>{
+    if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'pos-return',clear},window.location.origin);window.opener.focus();window.close();}
+    else window.location.assign('/?page=pos-slips');
+  };
+  document.getElementById('back-button').addEventListener('click',()=>returnToPicker(false));
+  document.getElementById('search-button').addEventListener('click',()=>returnToPicker(true));
 }
 
 showPosSlip().catch(error=>{document.getElementById('status').textContent=error.message;});

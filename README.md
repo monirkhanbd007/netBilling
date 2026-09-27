@@ -147,6 +147,8 @@ bill is zero are omitted.
 
 In **POS Bill Slip**, choose the office, month, and one customer, then select
 **Preview & Print POS Slip**. It opens a separate 80 mm thermal receipt preview.
+Use **Back** to return to the picker with the current selection, or **Search New
+Customer** to clear it and find another customer by name, ID, or mobile.
 Select an **80 mm printer**, **100% scale**, **no margins**, and disable browser
 headers and footers. Each print contains one customer copy and uses the same
 database bill and office payment settings as the A4 slip.
