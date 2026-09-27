@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import {Router} from 'express';
 import {pool,tx,one,all,fail,month,date,money,currentMonth,today} from './db.js';
 import {scope,requireOffice,superAdmin} from './auth.js';
-import {billLine,financial,cents,taka} from './calculations.js';
+import {billLine,financial,outstanding,cents,taka} from './calculations.js';
 import {readSupportPhone} from './support-phone.js';
 import {readPaymentNumbers} from './payment-numbers.js';
 
@@ -27,7 +27,10 @@ finance.get('/dashboard',async(req,res)=>{
   CROSS JOIN LATERAL (SELECT COALESCE(SUM(amount),0) AS expenses FROM ib_office_expenses WHERE office_id=o.id AND TO_CHAR(expense_date,'YYYY-MM')=$1) e
   CROSS JOIN LATERAL (SELECT COALESCE(SUM(total_salary),0) AS salary FROM ib_staff_salary WHERE office_id=o.id AND salary_month=$1) s
   WHERE o.status='active' ${officeId?'AND o.id=$2':''} ORDER BY o.office_name`,officeId?[m,officeId]:[m]);
- const rows=data.map(r=>({...r,active:Number(r.active),inactive:Number(r.inactive),...financial(r.billing,r.received,r.isp,r.expenses,r.salary)}));
+ const rows=await Promise.all(data.map(async r=>{
+  const bills=await billData(pool,r.office_id,m);
+  return {...r,active:Number(r.active),inactive:Number(r.inactive),...financial(r.received,r.isp,r.expenses,r.salary),due:outstanding(bills.rows)};
+ }));
  res.json({month:m,rows});
 });
 finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month);res.json({month:m,office_id:id,...await billData(pool,id,m)});});

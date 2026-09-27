@@ -4,7 +4,8 @@ export function billLine(monthly,previous,paid=0){
  const total=cents(monthly)+cents(previous),received=Math.min(total,cents(paid)),balance=Math.max(0,total-received);
  return {monthly_bill:taka(cents(monthly)),previous_due:taka(cents(previous)),total_due:taka(total),paid_amount:taka(received),balance_due:taka(balance),status:balance?'due':'paid'};
 }
-export function financial(billing,received,isp,expense,salary){
- const [b,r,i,e,s]=[billing,received,isp,expense,salary].map(cents);
- return {due:taka(Math.max(0,b-r)),net_balance:taka(r-i-e-s)};
+export const outstanding = rows => taka(rows.reduce((total,row)=>total+cents(row.balance_due),0));
+export function financial(received,isp,expense,salary){
+ const [r,i,e,s]=[received,isp,expense,salary].map(cents);
+ return {net_balance:taka(r-i-e-s)};
 }
