@@ -65,3 +65,5 @@
   .login-card{padding:28px 22px}
 }
 @media screen and (prefers-reduced-motion:reduce){.sidebar{transition:none}}
+
+.account-password{display:block;border:0;padding:0;margin-top:5px;background:none;color:#58ded4;font-size:11px;text-align:left}.account-password:hover{text-decoration:underline}
