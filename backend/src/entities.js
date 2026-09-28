@@ -113,7 +113,7 @@ entities.put('/:name/:id',async(req,res)=>{
   if(req.params.name==='users'){
     if(data.role==='Super Admin'&&!superAdmin(u))fail(403,'Cannot promote to Super Admin.');
     if(data.role&&!['Super Admin','Office Admin','Collection User','Support User'].includes(data.role))fail(400,'Invalid role.');
-    if(data.role==='Super Admin'){onlySuper(u);data.office_id=0;}
+    if((data.role??old.role)==='Super Admin'){data.office_id=0;errorIfMissing(b.password,'password');}
     if(b.password){if(String(b.password).length<8)fail(400,'Password must contain at least 8 characters.');data.password=await bcrypt.hash(String(b.password),12);}
   }
   delete data.invoice_no;

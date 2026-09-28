@@ -26,6 +26,8 @@ test('only a Super Admin can change a Super Admin password with All offices acce
  });
  assert.equal((await change('Office Admin','new-password-123')).status,403);
  assert.equal(updated,undefined);
+ assert.equal((await change('Super Admin','')).status,400);
+ assert.equal(updated,undefined);
  assert.equal((await change('Super Admin','short')).status,400);
  assert.equal(updated,undefined);
  const response=await change('Super Admin','new-password-123');
