@@ -38,6 +38,15 @@ export async function signIn(username,password,res){
   return {id:user.id,name:user.name,username:user.username,role:user.role,office_id:user.office_id};
 }
 export async function signOut(req,res){const token=parseCookie(req);if(token)await pool.query('DELETE FROM ib_sessions WHERE token_hash=$1',[digest(token)]);res.clearCookie(cookie,{path:'/'});}
+export async function changeOwnPassword(user,currentPassword,newPassword){
+ if(!currentPassword)fail(400,'Enter your current password.');
+ if(newPassword.length<8)fail(400,'New password must contain at least 8 characters.');
+ if(Buffer.byteLength(newPassword,'utf8')>72)fail(400,'New password is too long.');
+ const account=await one(pool,'SELECT password FROM ib_users WHERE id=$1',[user.id]);
+ if(!account||!await verifyPassword(currentPassword,account.password))fail(403,'Current password is incorrect.');
+ const changed=await one(pool,'UPDATE ib_users SET password=$1 WHERE id=$2 AND password=$3 RETURNING id',[await bcrypt.hash(newPassword,12),user.id,account.password]);
+ if(!changed)fail(409,'Password changed during this request. Please try again.');
+}
 export const superAdmin=u=>u.role==='Super Admin';
 export function scope(u,requested){const id=Number(requested)||0;if(superAdmin(u))return id;if(Number(u.office_id)<1)fail(403,'No office assigned.');return Number(u.office_id);}
 export function requireOffice(u,requested){const id=Number(requested);if(!Number.isSafeInteger(id)||id<1||(!superAdmin(u)&&id!==Number(u.office_id)))fail(403,'Office access denied.');return id;}
