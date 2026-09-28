@@ -20,6 +20,7 @@ const expenseTypeKey=id=>`expense_types_office_${id}`;
 const normalizedExpenseType=value=>{const type=String(value??'').trim();if(!type||type.length>100)fail(400,'Enter an expense type of up to 100 characters.');return type;};
 async function accessRecord(db,u,def,id){
   const record=await one(db,`SELECT * FROM ${def.table} WHERE id=$1`,[id]);if(!record)fail(404,'Record not found.');
+  if(def.secret){onlySuper(u);return record;}
   if(def.global){if(!superAdmin(u)&&Number(record.id)!==Number(u.office_id))fail(403,'Office access denied.');}
   else if(def.append){const c=await one(db,'SELECT office_id FROM ib_customers WHERE id=$1',[record.customer_db_id]);if(!superAdmin(u)&&Number(c?.office_id)!==Number(u.office_id))fail(403,'Office access denied.');}
   else requireOffice(u,record.office_id);
@@ -48,6 +49,7 @@ entities.post('/expense-types',async(req,res)=>{
 });
 entities.get('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user;
+  if(def.secret)onlySuper(u);
   if(def.global){const rows=await all(pool,`SELECT * FROM ${def.table} ${superAdmin(u)?'':'WHERE id=$1'} ORDER BY id DESC`,superAdmin(u)?[]:[scope(u)]);return res.json(rows);}
   let where='',params=[];
   if(def.append){where=superAdmin(u)?'':'WHERE customer_db_id IN (SELECT id FROM ib_customers WHERE office_id=$1)';params=superAdmin(u)?[]:[scope(u)];}
@@ -65,6 +67,7 @@ entities.get('/:name',async(req,res)=>{
 });
 entities.post('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user,b=req.body||{};
+  if(def.secret)onlySuper(u);
   if(def.global)onlySuper(u);
   let data={};for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
   if(!def.global&&!def.append&&!(req.params.name==='users'&&b.role==='Super Admin')){data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
@@ -94,6 +97,7 @@ entities.post('/:name',async(req,res)=>{
 });
 entities.put('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');const u=req.user;
+  if(def.secret)onlySuper(u);
   if(def.global)onlySuper(u);
   const old=await accessRecord(pool,u,def,req.params.id),b=req.body||{},data={};
   for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
@@ -117,7 +121,7 @@ entities.put('/:name/:id',async(req,res)=>{
   const row=await one(pool,`UPDATE ${def.table} SET ${keys.map((k,i)=>`${k}=$${i+1}`).join(',')} WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(data),old.id]);if(def.secret)delete row.password;res.json(row);
 });
 entities.delete('/:name/:id',async(req,res)=>{
-  const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');if(def.global)onlySuper(req.user);
+  const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');if(def.global||def.secret)onlySuper(req.user);
   const record=await accessRecord(pool,req.user,def,req.params.id);
   if(req.params.name==='users'&&String(record.id)===String(req.user.id))fail(400,'Cannot delete your own account.');
   if(req.params.name==='offices'&&await one(pool,"SELECT 1 FROM ib_customers WHERE office_id=$1 UNION ALL SELECT 1 FROM ib_users WHERE office_id=$1 LIMIT 1",[record.id]))fail(409,'Office contains customers or users.');
