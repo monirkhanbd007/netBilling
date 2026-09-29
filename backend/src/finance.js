@@ -115,9 +115,12 @@ finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
  const billRows=sortReportRowsByCustomerId(rows.filter(r=>cents(r.total_due)>0));
  const customerIds=billRows.map(r=>r.customer_db_id);
- const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
- const usernames=new Map(customers.map(c=>[String(c.id),c.pppoe_username]));
- const detailedRows=billRows.map(r=>({...r,pppoe_username:usernames.get(String(r.customer_db_id))||r.pppoe_username||r.customer_id||''}));
+ const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username,address FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
+ const customerDetails=new Map(customers.map(c=>[String(c.id),c]));
+ const detailedRows=billRows.map(r=>{
+  const customer=customerDetails.get(String(r.customer_db_id));
+  return {...r,address:customer?.address??r.address??'',pppoe_username:customer?.pppoe_username||r.pppoe_username||r.customer_id||''};
+ });
  const sum=key=>taka(detailedRows.reduce((n,r)=>n+cents(r[key]),0));
  const isp=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments WHERE office_id=$1 AND (bill_month=$2 OR TO_CHAR(payment_date,'YYYY-MM')=$2 OR bill_month LIKE $3)",[id,m,m+'%']);
  res.json({month:m,office_id:id,processed:!!batch,count:detailedRows.length,monthly:sum('monthly_bill'),previous_due:sum('previous_due'),total_due:sum('total_due'),paid:sum('paid_amount'),balance:sum('balance_due'),isp:isp.n,profit:taka(cents(sum('paid_amount'))-cents(isp.n)),rows:detailedRows});

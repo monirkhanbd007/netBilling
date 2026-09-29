@@ -6,13 +6,13 @@ const csvCell = value => {
   return `"${text.replaceAll('"', '""')}"`;
 };
 
-const columns = ['SL No.', 'Customer ID', 'Customer Name', 'Mobile', 'Area', 'PPPoE Username',
+const columns = ['SL No.', 'Customer ID', 'Customer Name', 'Mobile', 'Address', 'PPPoE Username',
   'Monthly Bill', 'Previous Due', 'Total Due', 'Paid Amount', 'Pending Due', 'Status'];
 
 export function buildBillReportCsv(report, officeName, monthName) {
   const line = cells => cells.map(csvCell).join(',');
   const rows = report.rows.map((row, index) => line([
-    index + 1, row.customer_id, row.customer_name, row.mobile, row.area, row.pppoe_username,
+    index + 1, row.customer_id, row.customer_name, row.mobile, row.address, row.pppoe_username,
     row.monthly_bill, row.previous_due, row.total_due, row.paid_amount, row.balance_due, reportStatus(row)
   ]));
   const total = line(['', 'TOTAL', '', '', '', '', report.monthly, report.previous_due,
