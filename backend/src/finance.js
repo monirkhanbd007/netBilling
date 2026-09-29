@@ -5,6 +5,7 @@ import {scope,requireOffice,superAdmin} from './auth.js';
 import {billLine,financial,outstanding,cents,taka} from './calculations.js';
 import {readSupportPhone} from './support-phone.js';
 import {readPaymentNumbers} from './payment-numbers.js';
+import {sortReportRowsByCustomerId} from './report-order.js';
 
 export const finance=Router();
 const officeOf=(u,v)=>{const n=scope(u,v);return requireOffice(u,n);};
@@ -112,7 +113,7 @@ finance.get('/slips',async(req,res)=>{
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
- const billRows=rows.filter(r=>cents(r.total_due)>0);
+ const billRows=sortReportRowsByCustomerId(rows.filter(r=>cents(r.total_due)>0));
  const customerIds=billRows.map(r=>r.customer_db_id);
  const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
  const usernames=new Map(customers.map(c=>[String(c.id),c.pppoe_username]));
