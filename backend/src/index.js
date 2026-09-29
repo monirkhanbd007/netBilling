@@ -12,7 +12,7 @@ app.post('/api/login',async(req,res)=>res.json(await signIn(String(req.body?.use
 app.use('/api',authenticate);
 app.get('/api/me',(req,res)=>res.json(req.user));
 app.put('/api/me/password',async(req,res)=>{await changeOwnPassword(req.user,String(req.body?.current_password??''),String(req.body?.new_password??''));res.json({ok:true});});
-app.put('/api/users/:id/password-reset',async(req,res)=>{await resetUserPassword(req.user,req.params.id,String(req.body?.admin_password??''),String(req.body?.new_password??''));res.json({ok:true});});
+app.put('/api/users/:id/password-reset',async(req,res)=>{await resetUserPassword(req.user,req.params.id,String(req.body?.new_password??''));res.json({ok:true});});
 app.post('/api/logout',async(req,res)=>{await signOut(req,res);res.json({ok:true});});
 app.use('/api/entities',entities);app.use('/api',finance);
 app.get('/api/backup',async(req,res)=>{onlySuper(req.user);const tables=['ib_offices','ib_users','ib_packages','ib_customers','ib_bill_batches','ib_bill_lines','ib_payments','ib_isp_payments','ib_office_expenses','ib_staff_salary','ib_line_transfer','ib_new_line','ib_settings'];

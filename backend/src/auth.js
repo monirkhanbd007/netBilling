@@ -47,15 +47,12 @@ export async function changeOwnPassword(user,currentPassword,newPassword){
  const changed=await one(pool,'UPDATE ib_users SET password=$1 WHERE id=$2 AND password=$3 RETURNING id',[await bcrypt.hash(newPassword,12),user.id,account.password]);
  if(!changed)fail(409,'Password changed during this request. Please try again.');
 }
-export async function resetUserPassword(admin,targetId,adminPassword,newPassword){
+export async function resetUserPassword(admin,targetId,newPassword){
  onlySuper(admin);
  const id=Number(targetId);
  if(!Number.isSafeInteger(id)||id<1)fail(400,'Invalid user.');
- if(!adminPassword)fail(400,'Enter your current password.');
  if(newPassword.length<8)fail(400,'New password must contain at least 8 characters.');
  if(Buffer.byteLength(newPassword,'utf8')>72)fail(400,'New password is too long.');
- const account=await one(pool,'SELECT password FROM ib_users WHERE id=$1',[admin.id]);
- if(!account||!await verifyPassword(adminPassword,account.password))fail(403,'Current password is incorrect.');
  const hash=await bcrypt.hash(newPassword,12);
  await tx(async db=>{
   const target=await one(db,'UPDATE ib_users SET password=$1 WHERE id=$2 RETURNING id',[hash,id]);
