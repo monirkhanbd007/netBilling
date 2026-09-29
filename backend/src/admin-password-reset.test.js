@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import app from './index.js';
 import {pool} from './db.js';
 
-test('only a reauthenticated Super Admin can reset a user password and revoke sessions',async t=>{
+test('a signed-in Super Admin can reset a user password without the current password and revoke sessions',async t=>{
  const originalQuery=pool.query,originalConnect=pool.connect;
  const accounts=new Map([
   [1,{id:1,name:'Admin',username:'admin',role:'Super Admin',office_id:0,password:await bcrypt.hash('admin-password',4)}],
@@ -19,7 +19,6 @@ test('only a reauthenticated Super Admin can reset a user password and revoke se
    const account=accounts.get(sessions.get(params[0]));
    return {rows:account?[{id:account.id,name:account.name,username:account.username,role:account.role,office_id:account.office_id}]:[]};
   }
-  if(sql==='SELECT password FROM ib_users WHERE id=$1')return {rows:accounts.has(params[0])?[{password:accounts.get(params[0]).password}]:[]};
   throw Error('Unexpected query: '+sql);
  };
  pool.connect=async()=>({
@@ -45,9 +44,8 @@ test('only a reauthenticated Super Admin can reset a user password and revoke se
  const put=(id,body,token='admin-token')=>fetch(`http://127.0.0.1:${server.address().port}/api/users/${id}/password-reset`,{
   method:'PUT',headers:{'Content-Type':'application/json',Cookie:`ibm_session=${token}`},body:JSON.stringify(body)
  });
- const request={admin_password:'admin-password',new_password:'new-office-password'};
+ const request={new_password:'new-office-password'};
  assert.equal((await put(2,request,'office-token')).status,403);
- assert.equal((await put(2,{...request,admin_password:'wrong'})).status,403);
  assert.equal((await put(2,{...request,new_password:'short'})).status,400);
  assert.equal((await put(2,request,'missing-token')).status,401);
  assert.equal(transactionCount,0);
@@ -57,7 +55,7 @@ test('only a reauthenticated Super Admin can reset a user password and revoke se
  assert.equal(await bcrypt.compare('admin-password',accounts.get(1).password),true);
  assert.equal(sessions.has(hash('office-token')),false);
  assert.equal(sessions.has(hash('admin-token')),true);
- assert.equal((await put(1,{admin_password:'admin-password',new_password:'new-admin-password'})).status,200);
+ assert.equal((await put(1,{new_password:'new-admin-password'})).status,200);
  assert.equal(sessions.has(hash('admin-token')),false);
  assert.equal((await put(2,request)).status,401);
 });
