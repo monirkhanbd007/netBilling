@@ -14,14 +14,14 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 
 | Rule | Implementation |
 | --- | --- |
-| Monthly bill | One processed snapshot per office/month, including all customers as in the plugin; `total_due = monthly_bill + previous_due`. |
+| Monthly bill | One processed snapshot per office/month. The next month uses each customer's remaining balance from the latest earlier processed bill as `previous_due`; a customer without an earlier bill keeps the entered opening due. `total_due = monthly_bill + previous_due`. |
 | Collections | Partial payments reduce balance; methods: Cash, bKash, Nagad, Rocket, Bank, Other. Payments can be reversed. |
 | Dashboard due | `max(0, active customer monthly bill − received customer payments for selected month)`. |
 | Dashboard net | `received customer payments − ISP bill − office expenses − staff salary`. |
 | Report profit | Collections for the bill snapshot minus ISP payments for the month. |
 | Office permissions | Super Admin sees all offices; other accounts are restricted to their own office. |
 
-**Data consistency adjustment:** Payments collected before a month's bill is processed are attached to that bill snapshot when it is processed. A processed bill cannot be reversed until its linked payments have been reversed. This prevents lost payment history and incorrect balances. The original plugin could delete a processed batch while leaving payment references.
+**Data consistency adjustment:** Payments collected before a month's bill is processed are attached to that bill snapshot when it is processed. After a later month is processed, collect any carried balance against that later month's bill. Earlier payments and bills cannot be reversed until the later bill is reversed, and a processed bill cannot be reversed while it still has linked payments. This prevents double-counting carried balances.
 
 ## Requirements
 

@@ -1,22 +1,28 @@
 import crypto from 'node:crypto';
 import {Router} from 'express';
 import {pool,tx,one,all,fail,month,date,money,currentMonth,today} from './db.js';
-import {scope,requireOffice,superAdmin,paymentCollector} from './auth.js';
+import {scope,requireOffice,paymentCollector} from './auth.js';
 import {billLine,financial,outstanding,cents,taka} from './calculations.js';
 import {readSupportPhone} from './support-phone.js';
 import {readPaymentNumbers} from './payment-numbers.js';
 import {sortReportRowsByCustomerId} from './report-order.js';
+import {previousBillBalances,previousDueFor} from './carry-forward.js';
 
 export const finance=Router();
 const officeOf=(u,v)=>{const n=scope(u,v);return requireOffice(u,n);};
 const selectedMonth=q=>month(q||currentMonth());
+const lockBillingOffice=(db,id)=>one(db,'SELECT id FROM ib_offices WHERE id=$1 FOR UPDATE',[id]);
+const laterProcessedBill=(db,id,m)=>one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2 AND status='processed' LIMIT 1",[id,m]);
 async function billData(db,officeId,m){
  const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[officeId,m]);
  if(batch)return {batch,rows:await all(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 ORDER BY customer_name,id',[batch.id])};
  const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[officeId]);
- const payments=await all(db,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS amount FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[officeId,m]);
+ const [payments,priorBalances]=await Promise.all([
+  all(db,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS amount FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[officeId,m]),
+  previousBillBalances(db,officeId,m)
+ ]);
  const paidByCustomer=new Map(payments.map(p=>[String(p.customer_db_id),p.amount]));
- return {batch:null,rows:customers.map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,c.previous_due,paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
+ return {batch:null,rows:customers.map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,previousDueFor(c,priorBalances),paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
 }
 const publicBillRow=({pppoe_password,...row})=>row;
 const collectionBillRow=r=>({id:r.id,customer_db_id:r.customer_db_id,customer_id:r.customer_id,customer_name:r.customer_name,customer_status:r.customer_status,monthly_bill:r.monthly_bill,previous_due:r.previous_due,total_due:r.total_due,paid_amount:r.paid_amount,balance_due:r.balance_due,status:r.status});
@@ -40,16 +46,19 @@ finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.offic
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
+  await lockBillingOffice(db,id);
   if(await one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[id,m]))fail(409,'This month is already processed for the office.');
+  if(await laterProcessedBill(db,id,m))fail(409,'A later month is already processed. Reverse it before processing this month.');
+  const priorBalances=await previousBillBalances(db,id,m,{lock:true});
   const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[id]);
   if(!customers.length)fail(400,'No customers in the selected office.');
   const batch=await one(db,'INSERT INTO ib_bill_batches(office_id,bill_month) VALUES($1,$2) RETURNING *',[id,m]);
   for(const c of customers){
-   const x=billLine(c.monthly_bill,c.previous_due);
+   const x=billLine(c.monthly_bill,previousDueFor(c,priorBalances));
    const line=await one(db,`INSERT INTO ib_bill_lines(batch_id,customer_db_id,customer_id,customer_name,mobile,area,monthly_bill,previous_due,total_due,paid_amount,balance_due,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,[batch.id,c.id,c.customer_id,c.customer_name,c.mobile,c.area,x.monthly_bill,x.previous_due,x.total_due,x.paid_amount,x.balance_due,x.status]);
    // Payments collected against a live customer before processing are attached to this snapshot.
    const prior=await one(db,'SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND customer_db_id=$2 AND bill_month=$3 AND bill_line_id=0',[id,c.id,m]);
-   if(cents(prior.n)>0){const p=billLine(c.monthly_bill,c.previous_due,prior.n);
+   if(cents(prior.n)>0){const p=billLine(c.monthly_bill,x.previous_due,prior.n);
      if(cents(prior.n)>cents(p.total_due))fail(409,`Existing payments exceed bill for ${c.customer_id}.`);
      await db.query('UPDATE ib_bill_lines SET paid_amount=$1,balance_due=$2,status=$3 WHERE id=$4',[p.paid_amount,p.balance_due,p.status,line.id]);
      await db.query('UPDATE ib_payments SET bill_line_id=$1,batch_id=$2 WHERE office_id=$3 AND customer_db_id=$4 AND bill_month=$5 AND bill_line_id=0',[line.id,batch.id,id,c.id,m]);
@@ -59,7 +68,8 @@ finance.post('/bills/process',async(req,res)=>{
 });
 finance.post('/bills/reverse',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
- await tx(async db=>{const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed' FOR UPDATE",[id,m]);if(!batch)fail(404,'No processed bill found.');
+ await tx(async db=>{await lockBillingOffice(db,id);if(await laterProcessedBill(db,id,m))fail(409,'A later bill contains this balance. Reverse the later bill first.');
+  const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed' FOR UPDATE",[id,m]);if(!batch)fail(404,'No processed bill found.');
   if(await one(db,'SELECT 1 FROM ib_payments WHERE batch_id=$1 LIMIT 1',[batch.id]))fail(409,'Reverse the linked payments before reversing the bill.');
   await db.query('DELETE FROM ib_bill_lines WHERE batch_id=$1',[batch.id]);await db.query('DELETE FROM ib_bill_batches WHERE id=$1',[batch.id]);
  });res.json({ok:true});
@@ -83,11 +93,14 @@ finance.post('/payments',async(req,res)=>{
  if(amount<=0)fail(400,'Payment amount must be greater than zero.');
  const methods=['Cash','bKash','Nagad','Rocket','Bank','Other'],method=methods.includes(b.payment_method)?b.payment_method:'Other';
  const row=await tx(async db=>{
+  await lockBillingOffice(db,id);
+  if(await laterProcessedBill(db,id,m))fail(409,'This balance was carried into a later bill. Collect the payment against that bill month.');
   const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed' FOR UPDATE",[id,m]);
   let c,line;
   if(batch){line=await one(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 AND customer_db_id=$2 FOR UPDATE',[batch.id,b.customer_db_id]);if(!line)fail(404,'Customer is not in the processed bill.');}
   else {c=await one(db,"SELECT * FROM ib_customers WHERE id=$1 AND office_id=$2 AND status='active' FOR UPDATE",[b.customer_db_id,id]);if(!c)fail(404,'Active customer not found.');}
-  const total=cents(line?line.total_due:billLine(c.monthly_bill,c.previous_due).total_due);
+  const priorBalances=line?null:await previousBillBalances(db,id,m);
+  const total=cents(line?line.total_due:billLine(c.monthly_bill,previousDueFor(c,priorBalances)).total_due);
   const already=line?cents(line.paid_amount):cents((await one(db,'SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND customer_db_id=$2 AND bill_month=$3',[id,c.id,m])).n);
   if(amount>total-already)fail(400,`Payment exceeds current balance of Tk ${taka(Math.max(0,total-already))}.`);
   const receipt='RC-'+new Date().toISOString().replace(/\D/g,'').slice(0,14)+'-'+crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -98,7 +111,10 @@ finance.post('/payments',async(req,res)=>{
 });
 finance.delete('/payments/:id',async(req,res)=>{
  await tx(async db=>{
-  const p=await one(db,'SELECT * FROM ib_payments WHERE id=$1 FOR UPDATE',[req.params.id]);if(!p)fail(404,'Payment not found.');requireOffice(req.user,p.office_id);
+  const payment=await one(db,'SELECT office_id FROM ib_payments WHERE id=$1',[req.params.id]);if(!payment)fail(404,'Payment not found.');requireOffice(req.user,payment.office_id);
+  await lockBillingOffice(db,payment.office_id);
+  const p=await one(db,'SELECT * FROM ib_payments WHERE id=$1 FOR UPDATE',[req.params.id]);if(!p)fail(404,'Payment not found.');
+  if(await laterProcessedBill(db,p.office_id,p.bill_month))fail(409,'This payment was carried into a later bill. Reverse the later bill first.');
   if(p.bill_line_id){const l=await one(db,'SELECT * FROM ib_bill_lines WHERE id=$1 FOR UPDATE',[p.bill_line_id]);if(l){const n=Math.max(0,cents(l.paid_amount)-cents(p.amount)),b=Math.max(0,cents(l.total_due)-n);await db.query('UPDATE ib_bill_lines SET paid_amount=$1,balance_due=$2,status=$3 WHERE id=$4',[taka(n),taka(b),b?'due':'paid',l.id]);}}
   await db.query('DELETE FROM ib_payments WHERE id=$1',[p.id]);
  });res.status(204).end();
