@@ -45,3 +45,15 @@ test('slips without configured payment numbers show the office phone', () => {
   assert.match(html,/বিল পরিশোধ:<\/b> 01713818085/);
   assert.doesNotMatch(html,/বিকাশ:<\/b>/);
 });
+
+test('bill slip preview and A4 print follow numeric Customer ID order across pages', () => {
+  const ids=['gns410','gns402','gns405','gns403','gns401'];
+  const slips={month:'2026-09',office:{office_name:'GNS-2'},rows:ids.map(customer_id=>({customer_id,total_due:'1.00'}))};
+  const ordered=['gns401','gns402','gns403','gns405','gns410'];
+  assert.deepEqual(printableSlipRows(slips).map(row=>row.customer_id),ordered);
+  assert.deepEqual(slips.rows.map(row=>row.customer_id),ids);
+  const pages=buildSlipPrintHtml(slips).match(/<section class="page">[\s\S]*?<\/section>/g)||[];
+  assert.equal(pages.length,2);
+  assert.deepEqual(pages[0].match(/গ্রাহক আইডি<\/dt><dd>gns\d+<\/dd>/g)?.map(text=>text.match(/gns\d+/)[0]),ordered.slice(0,4).flatMap(id=>[id,id]));
+  assert.deepEqual(pages[1].match(/গ্রাহক আইডি<\/dt><dd>gns\d+<\/dd>/g)?.map(text=>text.match(/gns\d+/)[0]),['gns410','gns410']);
+});

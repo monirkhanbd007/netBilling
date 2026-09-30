@@ -11,7 +11,10 @@ export const bengaliMonth = month => new Intl.DateTimeFormat('bn-BD', {
   month: 'long', year: 'numeric', timeZone: 'UTC'
 }).format(new Date(`${month}-01T00:00:00Z`));
 
-export const printableSlipRows = slips => (slips?.rows || []).filter(row => Number(row.total_due) > 0);
+const customerIdOrder = new Intl.Collator('en', {numeric: true, sensitivity: 'base'});
+export const printableSlipRows = slips => (slips?.rows || [])
+  .filter(row => Number(row.total_due) > 0)
+  .sort((a, b) => customerIdOrder.compare(String(a.customer_id ?? ''), String(b.customer_id ?? '')));
 
 function slipCard(slips, row, index, count, copy) {
   const office = slips.office || {};
