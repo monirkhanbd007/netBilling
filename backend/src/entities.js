@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import {Router} from 'express';
-import {pool,one,all,fail,money,month,date,today} from './db.js';
+import {pool,tx,one,all,fail,money,month,date,today} from './db.js';
 import {scope,requireOffice,onlySuper,superAdmin,allOfficeAccess} from './auth.js';
 
 const definitions={
@@ -128,8 +128,14 @@ entities.put('/:name/:id',async(req,res)=>{
 });
 entities.delete('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');if(def.global||def.secret)onlySuper(req.user);
-  const record=await accessRecord(pool,req.user,def,req.params.id);
-  if(req.params.name==='users'&&String(record.id)===String(req.user.id))fail(400,'Cannot delete your own account.');
-  if(req.params.name==='offices'&&await one(pool,"SELECT 1 FROM ib_customers WHERE office_id=$1 UNION ALL SELECT 1 FROM ib_users WHERE office_id=$1 LIMIT 1",[record.id]))fail(409,'Office contains customers or users.');
-  await pool.query(`DELETE FROM ${def.table} WHERE id=$1`,[record.id]);res.status(204).end();
+  await tx(async db=>{
+    const record=await accessRecord(db,req.user,def,req.params.id);
+    if(req.params.name==='users'&&String(record.id)===String(req.user.id))fail(400,'Cannot delete your own account.');
+    if(req.params.name==='offices'&&await one(db,"SELECT 1 FROM ib_customers WHERE office_id=$1 UNION ALL SELECT 1 FROM ib_users WHERE office_id=$1 LIMIT 1",[record.id]))fail(409,'Office contains customers or users.');
+    if(req.params.name==='customers'&&!await one(db,'SELECT 1 FROM ib_payments WHERE customer_db_id=$1 LIMIT 1',[record.id])){
+      await db.query('DELETE FROM ib_bill_lines WHERE customer_db_id=$1 AND monthly_bill=0 AND previous_due=0 AND total_due=0 AND paid_amount=0 AND balance_due=0',[record.id]);
+    }
+    await db.query(`DELETE FROM ${def.table} WHERE id=$1`,[record.id]);
+  });
+  res.status(204).end();
 });
