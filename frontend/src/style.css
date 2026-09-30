@@ -67,3 +67,10 @@
 @media screen and (prefers-reduced-motion:reduce){.sidebar{transition:none}}
 
 .account-password{display:block;border:0;padding:0;margin-top:5px;background:none;color:#58ded4;font-size:11px;text-align:left}.account-password:hover{text-decoration:underline}
+
+/* Make customers with no monthly charge easy to find without hiding their status. */
+tbody tr.zero-bill-row{background:#fffaf0}
+tbody tr.zero-bill-row:hover{background:#fff3d9}
+.zero-bill-id{display:inline-flex;align-items:center;gap:7px;color:#805200;font-weight:800}
+.zero-bill-label{display:inline-block;border-radius:999px;padding:3px 7px;background:#f8dfaa;color:#704500;font-size:10px;font-weight:800;line-height:1;white-space:nowrap}
+.zero-bill-amount{color:#805200;font-weight:800;font-variant-numeric:tabular-nums}
