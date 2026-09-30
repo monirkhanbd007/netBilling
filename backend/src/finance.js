@@ -42,7 +42,7 @@ finance.get('/dashboard',async(req,res)=>{
  }));
  res.json({month:m,rows});
 });
-finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);res.json({month:m,office_id:id,...bill,rows:bill.rows.map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
+finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(bill.rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
