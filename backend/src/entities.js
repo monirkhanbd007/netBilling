@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import {Router} from 'express';
 import {pool,one,all,fail,money,month,date,today} from './db.js';
-import {scope,requireOffice,onlySuper,superAdmin} from './auth.js';
+import {scope,requireOffice,onlySuper,superAdmin,allOfficeAccess} from './auth.js';
 
 const definitions={
  offices:{table:'ib_offices',fields:['office_name','address','phone','manager','status'],required:['office_name'],global:true},
@@ -16,13 +16,21 @@ const definitions={
 };
 const errorIfMissing=(v,label)=>{if(v===undefined||v===null||String(v).trim()==='')fail(400,`${label} is required.`);};
 const knownOffice=async(id)=>{if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(400,'Office does not exist.');};
+async function userOffice(role,requested){
+ if(role==='Super Admin')return 0;
+ if(requested===undefined||requested===null||requested==='')fail(400,'Select an office or All offices.');
+ const id=Number(requested);
+ if(!Number.isSafeInteger(id)||id<0)fail(400,'Invalid office.');
+ if(id)await knownOffice(id);
+ return id;
+}
 const expenseTypeKey=id=>`expense_types_office_${id}`;
 const normalizedExpenseType=value=>{const type=String(value??'').trim();if(!type||type.length>100)fail(400,'Enter an expense type of up to 100 characters.');return type;};
 async function accessRecord(db,u,def,id){
   const record=await one(db,`SELECT * FROM ${def.table} WHERE id=$1`,[id]);if(!record)fail(404,'Record not found.');
   if(def.secret){onlySuper(u);return record;}
   if(def.global){if(!superAdmin(u)&&Number(record.id)!==Number(u.office_id))fail(403,'Office access denied.');}
-  else if(def.append){const c=await one(db,'SELECT office_id FROM ib_customers WHERE id=$1',[record.customer_db_id]);if(!superAdmin(u)&&Number(c?.office_id)!==Number(u.office_id))fail(403,'Office access denied.');}
+  else if(def.append){const c=await one(db,'SELECT office_id FROM ib_customers WHERE id=$1',[record.customer_db_id]);if(!allOfficeAccess(u)&&Number(c?.office_id)!==Number(u.office_id))fail(403,'Office access denied.');}
   else requireOffice(u,record.office_id);
   return record;
 }
@@ -50,10 +58,10 @@ entities.post('/expense-types',async(req,res)=>{
 entities.get('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user;
   if(def.secret)onlySuper(u);
-  if(def.global){const rows=await all(pool,`SELECT * FROM ${def.table} ${superAdmin(u)?'':'WHERE id=$1'} ORDER BY id DESC`,superAdmin(u)?[]:[scope(u)]);return res.json(rows);}
+  if(def.global){const rows=await all(pool,`SELECT * FROM ${def.table} ${allOfficeAccess(u)?'':'WHERE id=$1'} ORDER BY id DESC`,allOfficeAccess(u)?[]:[scope(u)]);return res.json(rows);}
   let where='',params=[];
-  if(def.append){where=superAdmin(u)?'':'WHERE customer_db_id IN (SELECT id FROM ib_customers WHERE office_id=$1)';params=superAdmin(u)?[]:[scope(u)];}
-  else if(!superAdmin(u)){where='WHERE office_id=$1';params=[scope(u)];}
+  if(def.append){where=allOfficeAccess(u)?'':'WHERE customer_db_id IN (SELECT id FROM ib_customers WHERE office_id=$1)';params=allOfficeAccess(u)?[]:[scope(u)];}
+  else if(!allOfficeAccess(u)){where='WHERE office_id=$1';params=[scope(u)];}
   else if(req.query.office_id){where='WHERE office_id=$1';params=[scope(u,req.query.office_id)];}
   if(req.query.search&&['customers','packages'].includes(req.params.name)){
     const field=req.params.name==='customers'?"(customer_id ILIKE $N OR customer_name ILIKE $N OR mobile ILIKE $N OR area ILIKE $N)":"package_name ILIKE $N";
@@ -63,14 +71,15 @@ entities.get('/:name',async(req,res)=>{
     params.push(month(req.query.month));
     where+=(where?' AND ':'WHERE ')+`bill_month=$${params.length}`;
   }
-  const rows=await all(pool,`SELECT ${def.secret?'id,office_id,name,username,role,status,created_date':'*'} FROM ${def.table} ${where} ORDER BY id DESC LIMIT 2000`,params);res.json(rows);
+  const order=req.params.name==='customers'?"CASE WHEN customer_id ~* '^gns[0-9]{1,12}$' THEN 0 ELSE 1 END,CASE WHEN customer_id ~* '^gns[0-9]{1,12}$' THEN SUBSTRING(customer_id FROM 4)::BIGINT END,customer_id,id":'id DESC';
+  const rows=await all(pool,`SELECT ${def.secret?'id,office_id,name,username,role,status,created_date':'*'} FROM ${def.table} ${where} ORDER BY ${order} LIMIT 2000`,params);res.json(rows);
 });
 entities.post('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user,b=req.body||{};
   if(def.secret)onlySuper(u);
   if(def.global)onlySuper(u);
   let data={};for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
-  if(!def.global&&!def.append&&!(req.params.name==='users'&&b.role==='Super Admin')){data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
+  if(!def.global&&!def.append&&!def.secret){data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
   if(Object.hasOwn(data,'expense_type'))data.expense_type=normalizedExpenseType(data.expense_type);
   for(const key of def.required||[])errorIfMissing(data[key],key);
   for(const key of def.money||[])if(data[key]!=null)data[key]=(money(data[key])/100).toFixed(2);
@@ -80,10 +89,8 @@ entities.post('/:name',async(req,res)=>{
   if(data.status&&!['active','inactive'].includes(data.status))fail(400,'Invalid status.');
   if(req.params.name==='customers'&&Number(data.package_id||0)>0){const p=await one(pool,'SELECT id FROM ib_packages WHERE id=$1 AND office_id=$2',[data.package_id,data.office_id]);if(!p)fail(400,'Package does not belong to this office.');}
   if(req.params.name==='users'){
-    if(data.role==='Super Admin'&&!superAdmin(u))fail(403,'Cannot create Super Admin.');
-    if(!['Super Admin','Office Admin','Collection User','Support User'].includes(data.role))fail(400,'Invalid role.');
-    if(data.role==='Super Admin'){onlySuper(u);data.office_id=0;}
-    else {data.office_id=scope(u,b.office_id);requireOffice(u,data.office_id);await knownOffice(data.office_id);}
+    if(!['Super Admin','Office Admin','Collection User','Support User','Payment Collector'].includes(data.role))fail(400,'Invalid role.');
+    data.office_id=await userOffice(data.role,b.office_id);
     errorIfMissing(b.password,'password');if(String(b.password).length<8)fail(400,'Password must contain at least 8 characters.');data.password=await bcrypt.hash(String(b.password),12);
   }
   if(def.append){const c=await one(pool,'SELECT * FROM ib_customers WHERE id=$1 AND status=$2',[b.customer_db_id,'active']);if(!c)fail(400,'Select an active customer.');requireOffice(u,c.office_id);
@@ -101,7 +108,7 @@ entities.put('/:name/:id',async(req,res)=>{
   if(def.global)onlySuper(u);
   const old=await accessRecord(pool,u,def,req.params.id),b=req.body||{},data={};
   for(const key of def.fields)if(Object.hasOwn(b,key))data[key]=b[key];
-  if(!def.global&&!(req.params.name==='users'&&(data.role??old.role)==='Super Admin')){const office=scope(u,data.office_id??old.office_id);requireOffice(u,office);await knownOffice(office);data.office_id=office;}
+  if(!def.global&&!def.secret){const office=scope(u,data.office_id??old.office_id);requireOffice(u,office);await knownOffice(office);data.office_id=office;}
   if(Object.hasOwn(data,'expense_type'))data.expense_type=normalizedExpenseType(data.expense_type);
   for(const key of def.required||[])if(Object.hasOwn(data,key))errorIfMissing(data[key],key);
   for(const key of def.money||[])if(Object.hasOwn(data,key))data[key]=(money(data[key])/100).toFixed(2);
@@ -111,10 +118,9 @@ entities.put('/:name/:id',async(req,res)=>{
   if(data.status&&!['active','inactive'].includes(data.status))fail(400,'Invalid status.');
   if(req.params.name==='customers'&&Number(data.package_id??old.package_id)>0){const p=await one(pool,'SELECT id FROM ib_packages WHERE id=$1 AND office_id=$2',[data.package_id??old.package_id,data.office_id]);if(!p)fail(400,'Package does not belong to this office.');}
   if(req.params.name==='users'){
-    if(data.role==='Super Admin'&&!superAdmin(u))fail(403,'Cannot promote to Super Admin.');
-    if(data.role&&!['Super Admin','Office Admin','Collection User','Support User'].includes(data.role))fail(400,'Invalid role.');
-    if(Object.hasOwn(b,'password'))fail(403,'Each user must change their own password.');
-    if((data.role??old.role)==='Super Admin')data.office_id=0;
+    if(data.role&&!['Super Admin','Office Admin','Collection User','Support User','Payment Collector'].includes(data.role))fail(400,'Invalid role.');
+    if(Object.hasOwn(b,'password'))fail(403,'Use the password reset action to change a user password.');
+    data.office_id=await userOffice(data.role??old.role,data.office_id??old.office_id);
   }
   delete data.invoice_no;
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');

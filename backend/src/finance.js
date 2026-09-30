@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import {Router} from 'express';
 import {pool,tx,one,all,fail,month,date,money,currentMonth,today} from './db.js';
-import {scope,requireOffice,superAdmin} from './auth.js';
+import {scope,requireOffice,superAdmin,paymentCollector} from './auth.js';
 import {billLine,financial,outstanding,cents,taka} from './calculations.js';
 import {readSupportPhone} from './support-phone.js';
 import {readPaymentNumbers} from './payment-numbers.js';
@@ -16,8 +16,10 @@ async function billData(db,officeId,m){
  const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[officeId]);
  const payments=await all(db,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS amount FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[officeId,m]);
  const paidByCustomer=new Map(payments.map(p=>[String(p.customer_db_id),p.amount]));
- return {batch:null,rows:customers.map(c=>({...c,...billLine(c.monthly_bill,c.previous_due,paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
+ return {batch:null,rows:customers.map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,c.previous_due,paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
 }
+const publicBillRow=({pppoe_password,...row})=>row;
+const collectionBillRow=r=>({id:r.id,customer_db_id:r.customer_db_id,customer_id:r.customer_id,customer_name:r.customer_name,customer_status:r.customer_status,monthly_bill:r.monthly_bill,previous_due:r.previous_due,total_due:r.total_due,paid_amount:r.paid_amount,balance_due:r.balance_due,status:r.status});
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
  const data=await all(pool,`SELECT o.id AS office_id,o.office_name,o.manager,c.active,c.inactive,c.billing,p.received,i.isp,e.expenses,s.salary
@@ -34,7 +36,7 @@ finance.get('/dashboard',async(req,res)=>{
  }));
  res.json({month:m,rows});
 });
-finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month);res.json({month:m,office_id:id,...await billData(pool,id,m)});});
+finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);res.json({month:m,office_id:id,...bill,rows:bill.rows.map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
@@ -63,7 +65,7 @@ finance.post('/bills/reverse',async(req,res)=>{
  });res.json({ok:true});
 });
 finance.get('/payments',async(req,res)=>{
- const id=scope(req.user,req.query.office_id),m=req.query.month?selectedMonth(req.query.month):null;
+ const id=paymentCollector(req.user)?officeOf(req.user,req.query.office_id):scope(req.user,req.query.office_id),m=req.query.month?selectedMonth(req.query.month):null;
  const filters=[],params=[];if(id){params.push(id);filters.push(`office_id=$${params.length}`);}if(m){params.push(m);filters.push(`bill_month=$${params.length}`);}
  if(req.query.method){params.push(String(req.query.method));filters.push(`payment_method=$${params.length}`);}
  if(req.query.date){params.push(date(req.query.date));filters.push(`payment_date=$${params.length}`);}
@@ -108,7 +110,7 @@ finance.get('/slips',async(req,res)=>{
  const ids=filtered.map(r=>r.customer_db_id);const customers=ids.length?await all(pool,'SELECT id,address,pppoe_username FROM ib_customers WHERE id=ANY($1::BIGINT[])',[ids]):[];
  const lookup=new Map(customers.map(c=>[String(c.id),c]));
  const [support,paymentNumbers]=await Promise.all([readSupportPhone(pool,id),readPaymentNumbers(pool,id)]);
- const enriched=filtered.map(r=>({...r,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
+ const enriched=filtered.map(r=>({...(paymentCollector(req.user)?collectionBillRow(r):publicBillRow(r)),mobile:r.mobile,area:r.area,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
  res.json({office,month:m,processed:!!batch,support_phone:support.value,payment_numbers:paymentNumbers,rows:enriched});
 });
 finance.get('/report',async(req,res)=>{
@@ -119,7 +121,7 @@ finance.get('/report',async(req,res)=>{
  const customerDetails=new Map(customers.map(c=>[String(c.id),c]));
  const detailedRows=billRows.map(r=>{
   const customer=customerDetails.get(String(r.customer_db_id));
-  return {...r,address:customer?.address??r.address??'',pppoe_username:customer?.pppoe_username||r.pppoe_username||r.customer_id||''};
+  return {...publicBillRow(r),address:customer?.address??r.address??'',pppoe_username:customer?.pppoe_username||r.pppoe_username||r.customer_id||''};
  });
  const sum=key=>taka(detailedRows.reduce((n,r)=>n+cents(r[key]),0));
  const isp=await one(pool,"SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments WHERE office_id=$1 AND (bill_month=$2 OR TO_CHAR(payment_date,'YYYY-MM')=$2 OR bill_month LIKE $3)",[id,m,m+'%']);

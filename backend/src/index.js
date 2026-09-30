@@ -1,7 +1,7 @@
 import path from 'node:path';import {fileURLToPath} from 'node:url';
 import express from 'express';
 import {pool,one,tx,fail} from './db.js';
-import {authenticate,signIn,signOut,changeOwnPassword,resetUserPassword,onlySuper,scope,requireOffice} from './auth.js';
+import {authenticate,signIn,signOut,changeOwnPassword,resetUserPassword,onlySuper,scope,requireOffice,paymentCollector,paymentCollectorRoute} from './auth.js';
 import {entities} from './entities.js';import {finance} from './finance.js';
 import {readSupportPhone,supportPhoneKey} from './support-phone.js';
 import {paymentNumbers,paymentNumbersKey,readPaymentNumbers} from './payment-numbers.js';
@@ -10,6 +10,12 @@ app.use((req,res,next)=>{if(!['GET','HEAD','OPTIONS'].includes(req.method)){cons
 app.get('/api/health',async(req,res)=>{await pool.query('SELECT 1');res.json({ok:true});});
 app.post('/api/login',async(req,res)=>res.json(await signIn(String(req.body?.username||''),String(req.body?.password||''),res)));
 app.use('/api',authenticate);
+app.use('/api',(req,res,next)=>{
+ if(!paymentCollector(req.user))return next();
+ const path=req.originalUrl.split('?')[0].replace(/^\/api(?=\/|$)/,'');
+ if(!paymentCollectorRoute(req.method,path))return res.status(403).json({error:'Payment Collector access only.'});
+ next();
+});
 app.get('/api/me',(req,res)=>res.json(req.user));
 app.put('/api/me/password',async(req,res)=>{await changeOwnPassword(req.user,String(req.body?.current_password??''),String(req.body?.new_password??''));res.json({ok:true});});
 app.put('/api/users/:id/password-reset',async(req,res)=>{await resetUserPassword(req.user,req.params.id,String(req.body?.new_password??''));res.json({ok:true});});

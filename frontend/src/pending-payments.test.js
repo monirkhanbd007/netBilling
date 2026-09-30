@@ -24,3 +24,11 @@ test('processed collection retains unpaid bill lines even if service is now inac
   const bill = {office_id: 4, month: '2026-09', batch: {id: 8}, rows};
   assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-09').map(row => row.customer_db_id), [2, 3]);
 });
+
+test('payment collector can use active status from bill data without customer credentials', () => {
+  const bill = {office_id: 4, month: '2026-09', batch: null, rows: [
+    {customer_db_id: 1, balance_due: '150.00', customer_status: 'active'},
+    {customer_db_id: 2, balance_due: '300.00', customer_status: 'inactive'}
+  ]};
+  assert.deepEqual(pendingBillCustomers(bill, [], 4, '2026-09').map(row => row.customer_db_id), [1]);
+});

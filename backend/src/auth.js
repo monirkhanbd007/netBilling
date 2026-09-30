@@ -61,6 +61,13 @@ export async function resetUserPassword(admin,targetId,newPassword){
  });
 }
 export const superAdmin=u=>u.role==='Super Admin';
-export function scope(u,requested){const id=Number(requested)||0;if(superAdmin(u))return id;if(Number(u.office_id)<1)fail(403,'No office assigned.');return Number(u.office_id);}
-export function requireOffice(u,requested){const id=Number(requested);if(!Number.isSafeInteger(id)||id<1||(!superAdmin(u)&&id!==Number(u.office_id)))fail(403,'Office access denied.');return id;}
+export const allOfficeAccess=u=>superAdmin(u)||Number(u.office_id)===0;
+export const paymentCollector=u=>u.role==='Payment Collector';
+export function scope(u,requested){const id=Number(requested)||0;if(allOfficeAccess(u))return id;if(Number(u.office_id)<1)fail(403,'No office assigned.');return Number(u.office_id);}
+export function requireOffice(u,requested){const id=Number(requested);if(!Number.isSafeInteger(id)||id<1||(!allOfficeAccess(u)&&id!==Number(u.office_id)))fail(403,'Office access denied.');return id;}
+export function paymentCollectorRoute(method,path){
+ if(method==='GET')return ['/me','/entities/offices','/bills','/payments','/slips'].includes(path)||/^\/payments\/\d+$/.test(path);
+ if(method==='PUT'&&path==='/me/password')return true;
+ return method==='POST'&&['/logout','/payments'].includes(path);
+}
 export function onlySuper(u){if(!superAdmin(u))fail(403,'Super Admin only.');}
