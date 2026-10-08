@@ -29,8 +29,8 @@ function backupHeader(response, name) {
   return key ? String(headers[key]) : '';
 }
 
-function backupFolder(properties) {
-  var id = properties.getProperty('DRIVE_FOLDER_ID');
+function backupFolder(properties, requestedId) {
+  var id = requestedId || properties.getProperty('DRIVE_FOLDER_ID');
   if (id) return DriveApp.getFolderById(id);
   var folder = DriveApp.createFolder('Internet Business Backups');
   properties.setProperty('DRIVE_FOLDER_ID', folder.getId());
@@ -52,18 +52,22 @@ function uploadBackup(force) {
     }
     var filename = backupHeader(response, 'X-Backup-Filename');
     var date = backupHeader(response, 'X-Backup-Date');
+    var requestedFolderId = backupHeader(response, 'X-Backup-Folder-Id');
     if (!/^internet-business-backup-\d{4}-\d{2}-\d{2}\.json\.enc$/.test(filename) ||
         filename !== 'internet-business-backup-' + date + '.json.enc') {
       throw new Error('Backup response did not include a valid filename and date.');
     }
-    var folder = backupFolder(properties);
+    if (requestedFolderId && !/^[A-Za-z0-9_-]{10,200}$/.test(requestedFolderId)) {
+      throw new Error('The site returned an invalid Google Drive folder ID.');
+    }
+    var folder = backupFolder(properties, requestedFolderId);
     var existing = folder.getFilesByName(filename);
     var file = existing.hasNext() ? existing.next() : folder.createFile(response.getBlob().setName(filename));
     var ack = UrlFetchApp.fetch(config.url + '/ack', {
       method: 'post',
       contentType: 'application/json',
       headers: headers,
-      payload: JSON.stringify({date: date, file_id: file.getId(), filename: filename}),
+      payload: JSON.stringify({date: date, file_id: file.getId(), filename: filename, folder_id: folder.getId()}),
       muteHttpExceptions: true
     });
     if (ack.getResponseCode() !== 200) throw new Error('Backup confirmation failed: HTTP ' + ack.getResponseCode());
