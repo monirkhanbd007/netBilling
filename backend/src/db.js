@@ -16,5 +16,9 @@ export function fail(status,message){const error=new Error(message);error.status
 export function money(value){const raw=String(value);const n=Number(raw);if(!/^\d+(?:\.\d{1,2})?$/.test(raw)||!Number.isFinite(n)||n<0||n>9999999999.99)fail(400,'Enter a valid nonnegative amount with at most two decimal places.');return Math.round(n*100);}
 export function month(value){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(value)))fail(400,'Invalid month (YYYY-MM).');return value;}
 export function date(value){let v=String(value||'');const d=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(d)v=`${d[3]}-${d[2]}-${d[1]}`;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))fail(400,'Invalid date.');const n=new Date(`${v}T00:00:00Z`);if(Number.isNaN(+n)||n.toISOString().slice(0,10)!==v)fail(400,'Invalid date.');return v;}
-export const today=()=>new Date().toISOString().slice(0,10);
-export const currentMonth=()=>today().slice(0,7);
+const businessDateFormatter=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'});
+export const today=(at=new Date())=>{
+ const parts=Object.fromEntries(businessDateFormatter.formatToParts(at).map(part=>[part.type,part.value]));
+ return `${parts.year}-${parts.month}-${parts.day}`;
+};
+export const currentMonth=(at=new Date())=>today(at).slice(0,7);

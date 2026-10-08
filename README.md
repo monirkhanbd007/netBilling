@@ -95,6 +95,15 @@ The local `restore-backup.js` writes a safety file under `recovery-backups/`;
 run it on a persistent local computer if ever needed, **not** inside a Vercel
 Function, whose filesystem is not suitable for persistent backup files.
 
+For production security, enable a Vercel Firewall rate limit on `/api/login`;
+the application does not yet share a login-attempt counter across serverless
+instances. Restrict access to Vercel and Neon project settings, and keep the
+database and backup encryption keys out of the frontend project. Manual JSON
+backups include account and customer credentials, so store downloaded files in
+an encrypted location and delete copies that are no longer needed. Keep Preview
+connected to a separate database and remove unused Neon preview branches when
+the plan's branch limit blocks deployments.
+
 ## Local setup on Windows
 
 1. Install Node.js 24 LTS (including npm) and PostgreSQL. Open a **new

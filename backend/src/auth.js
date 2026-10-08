@@ -38,14 +38,18 @@ export async function signIn(username,password,res){
   return {id:user.id,name:user.name,username:user.username,role:user.role,office_id:user.office_id};
 }
 export async function signOut(req,res){const token=parseCookie(req);if(token)await pool.query('DELETE FROM ib_sessions WHERE token_hash=$1',[digest(token)]);res.clearCookie(cookie,{path:'/'});}
-export async function changeOwnPassword(user,currentPassword,newPassword){
+export async function changeOwnPassword(user,currentPassword,newPassword,sessionToken){
  if(!currentPassword)fail(400,'Enter your current password.');
  if(newPassword.length<8)fail(400,'New password must contain at least 8 characters.');
  if(Buffer.byteLength(newPassword,'utf8')>72)fail(400,'New password is too long.');
  const account=await one(pool,'SELECT password FROM ib_users WHERE id=$1',[user.id]);
  if(!account||!await verifyPassword(currentPassword,account.password))fail(403,'Current password is incorrect.');
- const changed=await one(pool,'UPDATE ib_users SET password=$1 WHERE id=$2 AND password=$3 RETURNING id',[await bcrypt.hash(newPassword,12),user.id,account.password]);
- if(!changed)fail(409,'Password changed during this request. Please try again.');
+ await tx(async db=>{
+  const changed=await one(db,'UPDATE ib_users SET password=$1 WHERE id=$2 AND password=$3 RETURNING id',[await bcrypt.hash(newPassword,12),user.id,account.password]);
+  if(!changed)fail(409,'Password changed during this request. Please try again.');
+  // Keep this browser signed in, but revoke every other session for the account.
+  await db.query('DELETE FROM ib_sessions WHERE user_id=$1 AND token_hash<>$2',[user.id,digest(sessionToken)]);
+ });
 }
 export async function resetUserPassword(admin,targetId,newPassword){
  onlySuper(admin);
