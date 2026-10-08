@@ -129,6 +129,7 @@
   .login-card .brand-mark { width: 42px; height: 42px; }
 
   @media (max-width: 800px) {
+    body { min-width: 0; }
     .nav-backdrop { background: #0e1d52b8; }
     .menu-close { background: #ffffff2e; }
     .menu-button { background: #eff1fb; color: var(--theme-blue); }
