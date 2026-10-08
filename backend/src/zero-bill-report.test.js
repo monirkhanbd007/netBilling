@@ -23,7 +23,7 @@ test('live and processed reports and slips include zero bills with accurate tota
    ...row,customer_db_id:row.id,total_due:row.id===1?'800.00':row.previous_due,
    paid_amount:row.id===1?'100.00':'0.00',balance_due:row.id===1?'700.00':row.previous_due
   }))};
-  if(sql.startsWith('SELECT id,pppoe_username,address FROM ib_customers')||sql.startsWith('SELECT id,address,pppoe_username FROM ib_customers'))return {rows:customers.filter(row=>params[0].includes(row.id)).map(({id,address,pppoe_username})=>({id,address,pppoe_username}))};
+  if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers')||sql.startsWith('SELECT id,address,pppoe_username FROM ib_customers'))return {rows:customers.filter(row=>params[0].includes(row.id)).map(({id,address,pppoe_username,status})=>({id,address,pppoe_username,status}))};
   if(sql.includes('FROM ib_settings'))return {rows:[]};
   if(sql.includes('FROM ib_isp_payments'))return {rows:[{n:onlyZero?'0.00':'50.00'}]};
   throw Error('Unexpected query: '+sql);
@@ -81,7 +81,7 @@ test('274 customers including nine zero bills produce 274 report rows',async t=>
   if(sql.startsWith('SELECT * FROM ib_bill_lines'))return {rows:customers.map(row=>({
    ...row,customer_db_id:row.id,total_due:row.monthly_bill,paid_amount:'0.00',balance_due:row.monthly_bill
   }))};
-  if(sql.startsWith('SELECT id,pppoe_username,address FROM ib_customers'))return {rows:[]};
+  if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers'))return {rows:customers.map(({id,status})=>({id,status}))};
   if(sql.includes('FROM ib_isp_payments'))return {rows:[{n:'0.00'}]};
   throw Error('Unexpected query: '+sql);
  };
