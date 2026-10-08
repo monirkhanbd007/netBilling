@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
-import {backupIsDue,dhakaDateTime,dueBackupDate,validBackupTime} from '../src/backup-schedule.js';
+import {backupIsDue,dhakaDateTime,driveFolderId,dueBackupDate,saveBackupSchedule,validBackupTime} from '../src/backup-schedule.js';
 import {decryptBackup,encryptBackup} from '../src/backup.js';
 import {validBackupBearer} from '../src/scheduled-backup.js';
 
@@ -36,4 +36,24 @@ test('export bearer requires a configured secret',()=>{
  assert.equal(validBackupBearer(`Bearer ${secret}`,secret),true);
  assert.equal(validBackupBearer(`Bearer ${secret}wrong`,secret),false);
  assert.equal(validBackupBearer('Bearer short','short'),false);
+});
+
+test('Drive destination accepts only a Drive folder link or folder ID',()=>{
+ const id='1abCDEFghijkLMNopqrstUVwxyz012345';
+ assert.equal(driveFolderId(`https://drive.google.com/drive/u/0/folders/${id}?usp=sharing`),id);
+ assert.equal(driveFolderId(id),id);
+ assert.equal(driveFolderId(''), '');
+ assert.equal(driveFolderId('https://example.com/drive/folders/'+id),null);
+ assert.equal(driveFolderId('https://drive.google.com/file/d/'+id+'/view'),null);
+});
+
+test('saving a schedule normalizes the Drive link and keeps the chosen time',async()=>{
+ const values=new Map(),db={async query(sql,params){
+  if(sql.startsWith('INSERT')){values.set(params[0],JSON.parse(params[1]));return {rows:[]};}
+  return {rows:[...values].map(([key,value])=>({key,value}))};
+ }};
+ const id='1abCDEFghijkLMNopqrstUVwxyz012345';
+ const schedule=await saveBackupSchedule({time:'02:30',folder_id:`https://drive.google.com/drive/folders/${id}?usp=sharing`},db);
+ assert.equal(schedule.time,'02:30');
+ assert.equal(schedule.folder_id,id);
 });
