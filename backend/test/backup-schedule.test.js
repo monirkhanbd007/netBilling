@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {backupIsDue,dhakaDateTime,driveFolderId,dueBackupDate,saveBackupSchedule,validBackupTime} from '../src/backup-schedule.js';
-import {decryptBackup,encryptBackup} from '../src/backup.js';
+import {createBackupSnapshot,decryptBackup,encryptBackup} from '../src/backup.js';
 import {validBackupBearer} from '../src/scheduled-backup.js';
 
 test('backup time uses Bangladesh calendar day and the editable target time',()=>{
@@ -29,6 +29,17 @@ test('scheduled backup is encrypted and rejects wrong keys or damaged content',(
  assert.deepEqual(decryptBackup(envelope,key),snapshot);
  assert.throws(()=>decryptBackup(envelope,randomBytes(32).toString('base64')),/Unable to decrypt/);
  assert.throws(()=>decryptBackup({...envelope,data:'AA==',},key),/Unable to decrypt/);
+});
+
+test('full database snapshot keeps records from every office',async()=>{
+ const officeRows=[{id:1,office_name:'Gazipur Network System'},{id:2,office_name:'GNS-2'}];
+ const db={async query(sql){
+  if(sql==='SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')return {rows:[]};
+  if(sql.includes('WHERE office_id'))throw Error('Backup must not filter offices.');
+  return {rows:sql.startsWith('SELECT * FROM ib_offices ')?officeRows:[]};
+ }};
+ const snapshot=await createBackupSnapshot(db,new Date('2026-10-08T00:00:00Z'));
+ assert.deepEqual(snapshot.tables.find(table=>table.key==='ib_offices').rows,officeRows);
 });
 
 test('export bearer requires a configured secret',()=>{
