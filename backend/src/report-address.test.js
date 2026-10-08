@@ -10,9 +10,9 @@ test('processed report returns current customer addresses in Customer ID order',
   if(sql.startsWith('SELECT u.id,u.name,u.username,u.role,u.office_id FROM ib_sessions'))return {rows:[{id:1,name:'Admin',username:'admin',role:'Super Admin',office_id:0}]};
   if(sql.startsWith('SELECT * FROM ib_bill_batches'))return {rows:[{id:9}]};
   if(sql.startsWith('SELECT * FROM ib_bill_lines'))return {rows:[bill('gns445mehedi',2),bill('gin401',3)]};
-  if(sql.startsWith('SELECT id,pppoe_username,address FROM ib_customers'))return {rows:[
-   {id:2,pppoe_username:'pppoe-2',address:'House 45, North Road'},
-   {id:3,pppoe_username:'pppoe-3',address:'House 4, South Road'}
+  if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers'))return {rows:[
+   {id:2,pppoe_username:'pppoe-2',address:'House 45, North Road',status:'active'},
+   {id:3,pppoe_username:'pppoe-3',address:'House 4, South Road',status:'active'}
   ]};
   if(sql.startsWith('SELECT COALESCE(SUM(amount),0) AS n FROM ib_isp_payments'))return {rows:[{n:'0.00'}]};
   throw Error('Unexpected query: '+sql);

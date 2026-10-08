@@ -26,6 +26,13 @@ async function billData(db,officeId,m){
 }
 const publicBillRow=({pppoe_password,...row})=>row;
 const collectionBillRow=r=>({id:r.id,customer_db_id:r.customer_db_id,customer_id:r.customer_id,customer_name:r.customer_name,customer_status:r.customer_status,monthly_bill:r.monthly_bill,previous_due:r.previous_due,total_due:r.total_due,paid_amount:r.paid_amount,balance_due:r.balance_due,status:r.status});
+async function activeCustomerRows(db,rows){
+ if(!rows.length)return [];
+ const ids=rows.map(r=>r.customer_db_id);
+ const active=await all(db,"SELECT id FROM ib_customers WHERE id=ANY($1::BIGINT[]) AND status='active'",[ids]);
+ const activeIds=new Set(active.map(c=>String(c.id)));
+ return rows.filter(r=>activeIds.has(String(r.customer_db_id)));
+}
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
  const data=await all(pool,`SELECT o.id AS office_id,o.office_name,o.manager,c.active,c.inactive,c.billing,p.received,i.isp,e.expenses,s.salary
@@ -42,7 +49,7 @@ finance.get('/dashboard',async(req,res)=>{
  }));
  res.json({month:m,rows});
 });
-finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(bill.rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
+finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);const rows=req.query.active_only==='1'?await activeCustomerRows(pool,bill.rows):bill.rows;res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
@@ -131,10 +138,10 @@ finance.get('/slips',async(req,res)=>{
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
- const billRows=sortReportRowsByCustomerId(rows);
- const customerIds=billRows.map(r=>r.customer_db_id);
- const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username,address FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
+ const customerIds=rows.map(r=>r.customer_db_id);
+ const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username,address,status FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
  const customerDetails=new Map(customers.map(c=>[String(c.id),c]));
+ const billRows=sortReportRowsByCustomerId(rows.filter(r=>customerDetails.get(String(r.customer_db_id))?.status==='active'));
  const detailedRows=billRows.map(r=>{
   const customer=customerDetails.get(String(r.customer_db_id));
   return {...publicBillRow(r),address:customer?.address??r.address??'',pppoe_username:customer?.pppoe_username||r.pppoe_username||r.customer_id||''};
