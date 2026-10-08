@@ -69,3 +69,12 @@ test('bill slip preview and A4 print follow numeric Customer ID order across pag
   assert.deepEqual(pages[0].match(/গ্রাহক আইডি<\/dt><dd>gns\d+<\/dd>/g)?.map(text=>text.match(/gns\d+/)[0]),ordered.slice(0,4).flatMap(id=>[id,id]));
   assert.deepEqual(pages[1].match(/গ্রাহক আইডি<\/dt><dd>gns\d+<\/dd>/g)?.map(text=>text.match(/gns\d+/)[0]),['gns410','gns410']);
 });
+
+test('A4 slip numbers use the active-only row count',()=>{
+  const slips={month:'2026-10',office:{office_name:'GNS-2'},rows:Array.from({length:272},(_,index)=>({customer_id:`gns${index+1}`,total_due:'100.00'}))};
+  const html=buildSlipPrintHtml(slips);
+  assert.equal(printableSlipRows(slips).length,272);
+  assert.match(html,/বিল স্লিপ নং ০১ \/ ২৭২/);
+  assert.match(html,/বিল স্লিপ নং ২৭২ \/ ২৭২/);
+  assert.doesNotMatch(html,/বিল স্লিপ নং [^<]* \/ ২৭৪/);
+});

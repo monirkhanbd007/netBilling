@@ -23,7 +23,7 @@ test('live and processed reports and slips include zero bills with accurate tota
    ...row,customer_db_id:row.id,total_due:row.id===1?'800.00':row.previous_due,
    paid_amount:row.id===1?'100.00':'0.00',balance_due:row.id===1?'700.00':row.previous_due
   }))};
-  if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers')||sql.startsWith('SELECT id,address,pppoe_username FROM ib_customers'))return {rows:customers.filter(row=>params[0].includes(row.id)).map(({id,address,pppoe_username,status})=>({id,address,pppoe_username,status}))};
+  if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers')||sql.startsWith('SELECT id,address,pppoe_username,status FROM ib_customers'))return {rows:customers.filter(row=>params[0].includes(row.id)).map(({id,address,pppoe_username,status})=>({id,address,pppoe_username,status}))};
   if(sql.includes('FROM ib_settings'))return {rows:[]};
   if(sql.includes('FROM ib_isp_payments'))return {rows:[{n:onlyZero?'0.00':'50.00'}]};
   throw Error('Unexpected query: '+sql);
@@ -65,15 +65,16 @@ test('live and processed reports and slips include zero bills with accurate tota
  }
 });
 
-test('274 customers including nine zero bills produce 274 report rows',async t=>{
+test('274 customers with two inactive zero bills produce 272 report and A4 slip rows',async t=>{
  const originalQuery=pool.query;
  let processed=false;
  const customers=Array.from({length:274},(_,index)=>({
   id:index+1,office_id:4,customer_id:`gns${401+index}`,customer_name:`Customer ${index+1}`,
-  monthly_bill:index<265?'600.00':'0.00',previous_due:'0.00',status:'active'
+  monthly_bill:index<265?'600.00':'0.00',previous_due:'0.00',status:index<272?'active':'inactive'
  }));
  pool.query=async(sql)=>{
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,role:'Super Admin',office_id:0}]};
+  if(sql==='SELECT * FROM ib_offices WHERE id=$1')return {rows:[{id:4,office_name:'GNS-2'}]};
   if(sql.startsWith('SELECT * FROM ib_bill_batches'))return {rows:processed?[{id:9}]:[]};
   if(sql.includes('FROM ib_bill_batches')&&sql.includes('bill_month<$2'))return {rows:[]};
   if(sql.includes('SELECT * FROM ib_customers'))return {rows:customers};
@@ -82,14 +83,16 @@ test('274 customers including nine zero bills produce 274 report rows',async t=>
    ...row,customer_db_id:row.id,total_due:row.monthly_bill,paid_amount:'0.00',balance_due:row.monthly_bill
   }))};
   if(sql.startsWith('SELECT id,pppoe_username,address,status FROM ib_customers'))return {rows:customers.map(({id,status})=>({id,status}))};
+  if(sql.startsWith('SELECT id,address,pppoe_username,status FROM ib_customers'))return {rows:customers.map(({id,status})=>({id,status}))};
+  if(sql.includes('FROM ib_settings'))return {rows:[]};
   if(sql.includes('FROM ib_isp_payments'))return {rows:[{n:'0.00'}]};
   throw Error('Unexpected query: '+sql);
  };
  const server=app.listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));
  t.after(async()=>{pool.query=originalQuery;await new Promise(resolve=>server.close(resolve));});
- const get=async(path)=>{
-  const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}?office_id=4&month=2026-10`,{headers:{Cookie:'ibm_session=test'}});
+ const get=async(path,extra='')=>{
+  const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}?office_id=4&month=2026-10${extra}`,{headers:{Cookie:'ibm_session=test'}});
   assert.equal(response.status,200);
   return response.json();
  };
@@ -98,11 +101,13 @@ test('274 customers including nine zero bills produce 274 report rows',async t=>
  for(const mode of ['live','processed']){
   processed=mode==='processed';
   const report=await get('report');
-  assert.equal(report.count,customerList.length);
-  assert.equal(report.rows.length,274);
+  assert.equal(report.count,272);
+  assert.equal(report.rows.length,272);
   assert.equal(report.rows.filter(row=>Number(row.total_due)>0).length,265);
-  assert.equal(report.rows.filter(row=>Number(row.total_due)===0).length,9);
-  assert.deepEqual(report.rows.map(row=>row.customer_db_id).sort((a,b)=>a-b),customerList.map(row=>row.id).sort((a,b)=>a-b));
+  assert.equal(report.rows.filter(row=>Number(row.total_due)===0).length,7);
+  assert.deepEqual(report.rows.map(row=>row.customer_db_id).sort((a,b)=>a-b),customerList.filter(row=>row.status==='active').map(row=>row.id).sort((a,b)=>a-b));
   assert.equal(report.total_due,'159000.00');
+  assert.equal((await get('slips','&active_only=1')).rows.length,272);
+  assert.equal((await get('slips')).rows.length,274);
  }
 });

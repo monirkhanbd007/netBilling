@@ -130,10 +130,11 @@ finance.get('/slips',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month);const office=await one(pool,'SELECT * FROM ib_offices WHERE id=$1',[id]);
  if(!office)fail(404,'Office not found.');const {batch,rows}=await billData(pool,id,m);
  const customerId=Number(req.query.customer_db_id||0),filtered=customerId?rows.filter(r=>Number(r.customer_db_id)===customerId):rows;
- const ids=filtered.map(r=>r.customer_db_id);const customers=ids.length?await all(pool,'SELECT id,address,pppoe_username FROM ib_customers WHERE id=ANY($1::BIGINT[])',[ids]):[];
+ const ids=filtered.map(r=>r.customer_db_id);const customers=ids.length?await all(pool,'SELECT id,address,pppoe_username,status FROM ib_customers WHERE id=ANY($1::BIGINT[])',[ids]):[];
  const lookup=new Map(customers.map(c=>[String(c.id),c]));
+ const visibleRows=req.query.active_only==='1'?filtered.filter(r=>lookup.get(String(r.customer_db_id))?.status==='active'):filtered;
  const [support,paymentNumbers]=await Promise.all([readSupportPhone(pool,id),readPaymentNumbers(pool,id)]);
- const enriched=filtered.map(r=>({...(paymentCollector(req.user)?collectionBillRow(r):publicBillRow(r)),mobile:r.mobile,area:r.area,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
+ const enriched=visibleRows.map(r=>({...(paymentCollector(req.user)?collectionBillRow(r):publicBillRow(r)),mobile:r.mobile,area:r.area,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
  res.json({office,month:m,processed:!!batch,support_phone:support.value,payment_numbers:paymentNumbers,rows:enriched});
 });
 finance.get('/report',async(req,res)=>{
