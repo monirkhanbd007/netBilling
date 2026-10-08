@@ -1,4 +1,4 @@
-import {createApp} from 'vue';import {printableSlipRows} from './slip-print.js';import {pendingBillCustomers} from './pending-payments.js';import './style.css';
+import {createApp} from 'vue';import {printableSlipRows} from './slip-print.js';import {pendingBillCustomers} from './pending-payments.js';import './style.css';import './theme.css';
 import {buildBillReportCsv,reportStatus} from './report-summary.js';
 const api=async(url,method='GET',body)=>{const r=await fetch('/api'+url,{method,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});if(r.status===204)return null;const value=await r.json();if(!r.ok)throw Error(value.error||'Request failed');return value;};
 const money=v=>'৳'+Number(v||0).toLocaleString('en-BD',{minimumFractionDigits:2,maximumFractionDigits:2});

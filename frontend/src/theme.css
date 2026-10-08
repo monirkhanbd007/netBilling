@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap');
+
+/* Inspired by the reference site's blue hero, purple headings and white cards.
+   Keep billing and report print styles unchanged. */
+@media screen {
+  :root {
+    font-family: 'Segoe UI', 'Noto Sans Bengali', Arial, sans-serif;
+    color: #303347;
+    background: #f8f9fc;
+    --theme-blue: #2454bc;
+    --theme-blue-dark: #163b91;
+    --theme-purple: #6f42c1;
+    --theme-purple-dark: #59339d;
+    --theme-border: #e7e8f0;
+  }
+
+  body { background: #f8f9fc; }
+  h1, h2 { font-family: Montserrat, 'Segoe UI', sans-serif; }
+  h1 { color: #292c3b; }
+  h2 { color: var(--theme-purple); }
+  .muted { color: #717487; }
+  .eyebrow { color: var(--theme-purple); }
+
+  .sidebar {
+    background: linear-gradient(165deg, #2858bf 0%, #1d47aa 43%, #173783 100%);
+    border-right: 1px solid #173879;
+    box-shadow: 5px 0 26px #1c32752b;
+  }
+  .side-brand { border-bottom-color: #ffffff30; }
+  .brand-mark {
+    background: linear-gradient(135deg, #d337d9 0%, #8048d4 48%, #378be5 100%);
+    box-shadow: 0 5px 14px #14295d40;
+  }
+  .side-brand small, .side-caption { color: #d2dcff; }
+  .side-scroll { scrollbar-color: #9fb5ee transparent; }
+  .nav-item { color: #f0f3ff; }
+  .nav-item:hover { background: #ffffff27; }
+  .nav-item.selected {
+    background: linear-gradient(100deg, #8050d1, #6840b7);
+    box-shadow: inset 3px 0 #f4c4ff, 0 5px 15px #102a702b;
+  }
+  .nav-dot { border-color: #b9caf3; }
+  .selected .nav-dot { background: #fff; border-color: #fff; box-shadow: 0 0 0 3px #ffffff40; }
+  .side-account { border-top-color: #ffffff36; }
+  .side-account .avatar { background: #ffffff29; color: #fff; }
+  .side-account small { color: #d1ddfa; }
+  .account-password { color: #fff; }
+  .signout { border-color: #ffffff57; background: #ffffff14; color: #fff; }
+  .signout:hover { background: #ffffff2e; }
+  .nav-item:focus-visible, .menu-close:focus-visible, .account-password:focus-visible, .signout:focus-visible { outline-color: #fff; }
+
+  .topbar { background: #fff; border-bottom-color: var(--theme-border); box-shadow: 0 3px 18px #28376b0d; }
+  .breadcrumbs { color: #737891; }
+  .breadcrumbs strong { color: var(--theme-purple); }
+  .breadcrumbs span { color: #a6a8ba; }
+  .top-actions { background: #f1f3fb; color: #40528b; }
+  .menu-button { background: #eff1fb; color: var(--theme-blue); }
+  .menu-button:hover { background: #e1e6f8; }
+
+  .panel, .metric {
+    background: #fff;
+    border: 1px solid var(--theme-border);
+    border-radius: 14px;
+    box-shadow: 0 8px 25px #2734620d;
+  }
+  .panel-head { border-bottom-color: #edf0f7; }
+  .metric { position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, var(--theme-blue), var(--theme-purple)); }
+  .metric span, .report-grid span { color: #6d6592; }
+  .metric strong, .report-grid strong { color: var(--theme-purple); }
+  .metric small { color: #7b7f91; }
+  .placeholder-line { background: #ececf6; }
+
+  .primary { background: var(--theme-purple); box-shadow: 0 3px 8px #6f42c126; }
+  .primary:hover { background: var(--theme-purple-dark); }
+  .secondary { background: #f0ebfa; color: var(--theme-purple-dark); }
+  .secondary:hover { background: #e5dcf6; }
+  .row-actions button, .row-print, .expense-add-toggle, .month-name { color: var(--theme-purple); }
+  .row-actions button:hover, .row-print:hover { text-decoration: underline; }
+  .pill { background: #f0ebfa; color: var(--theme-purple-dark); }
+  .credential-toggle { background: #f2edfb; border-color: #dfd2f3; color: var(--theme-purple-dark); }
+  .credential-toggle:hover { background: #e7ddf6; }
+
+  .heading-controls select, .heading-controls input,
+  .form-grid input, .form-grid select, .form-grid textarea,
+  .toolbar input, .settings-form input, .login-card input,
+  .pos-form select, .customer-status-filter select {
+    border-color: #dcdfea;
+    color: #35374b;
+  }
+  .form-grid label, .settings-form label, .login-card label, .customer-status-filter { color: #555a76; }
+  .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus,
+  .login-card input:focus, .toolbar input:focus,
+  .settings-form input:focus, .heading-controls input:focus, .heading-controls select:focus,
+  .pos-form select:focus, .customer-status-filter select:focus {
+    outline: none;
+    border-color: var(--theme-purple);
+    box-shadow: 0 0 0 3px #6f42c124;
+  }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--theme-purple);
+    outline-offset: 2px;
+  }
+
+  th { background: #f5f3fa; color: #625b80; }
+  th, td { border-bottom-color: #eef0f5; }
+  td { color: #51566c; }
+  td strong, td b { color: #303347; }
+  td small { color: #81869b; }
+  tbody tr:hover { background: #faf8ff; }
+  .toolbar, .summary-line { border-bottom-color: #edf0f7; }
+  .summary-line { color: #646a81; }
+  .summary-line strong { color: var(--theme-purple); }
+  .report-grid { background: #edf0f7; border-bottom-color: #edf0f7; }
+  .report-panel .panel-head h2 { color: var(--theme-purple); }
+  .report-panel .panel-head .muted { color: #717487; }
+  .report-table thead th { background: #f2eef9; color: #493a67; }
+  .report-table tbody tr:nth-child(even) { background: #faf9fd; }
+  .report-table th, .report-table td { border-color: #d9dbe6; color: #333546; }
+  .report-table tfoot th { background: #e8e1f4; color: #302a42; border-top-color: var(--theme-purple); }
+
+  .modal-overlay { background: #101f4ca8; }
+  .modal { border-radius: 16px; box-shadow: 0 30px 80px #1725534d; }
+  .close { background: #f0ebfa; color: var(--theme-purple-dark); }
+  .pos-summary .total { background: #f4effb; }
+
+  .login-shell { background: radial-gradient(circle at 80% 20%, #6e43c680, transparent 35%), linear-gradient(145deg, #275bc4, #163887 75%); }
+  .login-card { border: 1px solid #ffffff9c; box-shadow: 0 24px 70px #10286652; }
+  .login-card .brand-mark { width: 42px; height: 42px; }
+
+  @media (max-width: 800px) {
+    .nav-backdrop { background: #0e1d52b8; }
+    .menu-close { background: #ffffff2e; }
+    .menu-button { background: #eff1fb; color: var(--theme-blue); }
+  }
+}
