@@ -23,6 +23,13 @@ test('POS print refuses a batch of customers',()=>{
   assert.throws(()=>buildPosSlipHtml({...slips,rows:[]}),/Select one/);
 });
 
+test('POS slip prints a zero bill without requiring a payment',()=>{
+  const html=buildPosSlipHtml({...slips,rows:[{...slips.rows[0],monthly_bill:'0.00',previous_due:'0.00',total_due:'0.00',paid_amount:'0.00',balance_due:'0.00'}]});
+  assert.match(html,/&lt;Abdul Jalil&gt;/);
+  assert.equal((html.match(/৳০\.০০/g)||[]).length,3);
+  assert.doesNotMatch(html,/পেমেন্ট রসিদ/);
+});
+
 test('recorded POS payment shows the saved amount and receipt details',()=>{
   const payment={office_id:4,customer_db_id:5,bill_month:'2026-09',amount:'350.00',receipt_no:'RC-123',payment_date:'2026-09-27T00:00:00.000Z',payment_method:'bKash'};
   const html=buildPosSlipHtml(slips,payment);

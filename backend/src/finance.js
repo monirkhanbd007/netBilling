@@ -131,7 +131,7 @@ finance.get('/slips',async(req,res)=>{
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
- const billRows=sortReportRowsByCustomerId(rows.filter(r=>cents(r.total_due)>0));
+ const billRows=sortReportRowsByCustomerId(rows);
  const customerIds=billRows.map(r=>r.customer_db_id);
  const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username,address FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
  const customerDetails=new Map(customers.map(c=>[String(c.id),c]));

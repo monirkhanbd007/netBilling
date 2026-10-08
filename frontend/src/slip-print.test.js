@@ -17,14 +17,15 @@ test('A4 slips render four customer pairs per page from escaped database fields'
       {customer_id:'fifth',customer_name:'Fifth customer',monthly_bill:'500.00',previous_due:'0.00',total_due:'500.00',paid_amount:'0.00',balance_due:'500.00'}
     ]
   };
-  assert.equal(printableSlipRows(slips).length,5);
+  assert.equal(printableSlipRows(slips).length,6);
   const html=buildSlipPrintHtml(slips);
   const pages=html.match(/<section class="page">[\s\S]*?<\/section>/g)||[];
   assert.equal(pages.length,2);
   assert.equal((pages[0].match(/class="slip"/g)||[]).length,8);
   assert.equal((pages[0].match(/অফিস কপি/g)||[]).length,4);
   assert.equal((pages[0].match(/গ্রাহক কপি/g)||[]).length,4);
-  assert.equal((pages[1].match(/class="slip"/g)||[]).length,2);
+  assert.equal((pages[1].match(/class="slip"/g)||[]).length,4);
+  assert.equal((html.match(/<dd>No bill<\/dd>/g)||[]).length,2);
   assert.match(html,/@page\{size:A4 portrait/);
   assert.match(html,/অফিস কপি/);
   assert.match(html,/গ্রাহক কপি/);
@@ -38,6 +39,17 @@ test('A4 slips render four customer pairs per page from escaped database fields'
   assert.doesNotMatch(html,/পরিশোধিত|বাকি/);
   assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html,/<script>alert\(1\)<\/script>/);
+});
+
+test('an office containing only zero bills still prints both copies with zero amounts',()=>{
+  const slips={month:'2026-09',office:{office_name:'GNS-2'},rows:[{
+    customer_id:'gns401',customer_name:'শূন্য বিল',monthly_bill:'0.00',previous_due:'0.00',total_due:'0.00'
+  }]};
+  const html=buildSlipPrintHtml(slips);
+  assert.equal(printableSlipRows(slips).length,1);
+  assert.equal((html.match(/class="slip"/g)||[]).length,2);
+  assert.equal((html.match(/৳০\.০০/g)||[]).length,6);
+  assert.equal((html.match(/<dd>শূন্য বিল<\/dd>/g)||[]).length,2);
 });
 
 test('slips without configured payment numbers show the office phone', () => {

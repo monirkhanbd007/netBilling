@@ -12,8 +12,7 @@ export const bengaliMonth = month => new Intl.DateTimeFormat('bn-BD', {
 }).format(new Date(`${month}-01T00:00:00Z`));
 
 const customerIdOrder = new Intl.Collator('en', {numeric: true, sensitivity: 'base'});
-export const printableSlipRows = slips => (slips?.rows || [])
-  .filter(row => Number(row.total_due) > 0)
+export const printableSlipRows = slips => [...(slips?.rows || [])]
   .sort((a, b) => customerIdOrder.compare(String(a.customer_id ?? ''), String(b.customer_id ?? '')));
 
 function slipCard(slips, row, index, count, copy) {

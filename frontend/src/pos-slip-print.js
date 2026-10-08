@@ -7,7 +7,7 @@ const bengaliDate=value=>{
 
 export function buildPosSlipHtml(slips, recordedPayment=null) {
   const rows=printableSlipRows(slips);
-  if(rows.length!==1)throw Error('Select one billable customer for POS printing.');
+  if(rows.length!==1)throw Error('Select one customer for POS printing.');
   const row=rows[0],office=slips.office||{};
   if(recordedPayment&&(Number(recordedPayment.office_id)!==Number(office.id)||Number(recordedPayment.customer_db_id)!==Number(row.customer_db_id)||recordedPayment.bill_month!==slips.month||!Number.isFinite(Number(recordedPayment.amount))||Number(recordedPayment.amount)<=0))throw Error('Payment does not match this bill slip.');
   const details=[

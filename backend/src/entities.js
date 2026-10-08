@@ -15,6 +15,31 @@ const definitions={
  'new-lines':{table:'ib_new_line',fields:['customer_db_id'],append:true}
 };
 const errorIfMissing=(v,label)=>{if(v===undefined||v===null||String(v).trim()==='')fail(400,`${label} is required.`);};
+const customerName=value=>{
+ if(typeof value!=='string')fail(400,'Customer name must be text.');
+ const name=value.normalize('NFC').trim().replace(/\s+/gu,' ');
+ if(!name||[...name].length>150)fail(400,'Enter a customer name of up to 150 characters.');
+ return name;
+};
+const customerNameKey=value=>String(value??'').normalize('NFC').trim().replace(/\s+/gu,' ').toLowerCase();
+async function saveCustomer(data,old,save){
+ return tx(async db=>{
+  // Serialize customer saves in this office so simultaneous requests cannot
+  // both pass the duplicate check before either customer is written.
+  if(!await one(db,'SELECT id FROM ib_offices WHERE id=$1 FOR UPDATE',[data.office_id]))fail(400,'Office does not exist.');
+  const current=old?await one(db,'SELECT * FROM ib_customers WHERE id=$1 FOR UPDATE',[old.id]):null;
+  if(old&&!current)fail(404,'Record not found.');
+  if(old&&Number(current.office_id)!==Number(old.office_id))fail(409,'Customer office changed. Reload and try again.');
+  if(Object.hasOwn(data,'customer_name'))data.customer_name=customerName(data.customer_name);
+  const name=customerNameKey(data.customer_name??current?.customer_name);
+  // Existing imported duplicates may still be edited without renaming them.
+  if(!current||Number(current.office_id)!==Number(data.office_id)||customerNameKey(current.customer_name)!==name){
+   const customers=await all(db,'SELECT id,customer_name FROM ib_customers WHERE office_id=$1',[data.office_id]);
+   if(customers.some(row=>String(row.id)!==String(current?.id)&&customerNameKey(row.customer_name)===name))fail(409,'A customer with this name already exists in this office. Enter a different name.');
+  }
+  return save(db);
+ });
+}
 const knownOffice=async(id)=>{if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(400,'Office does not exist.');};
 async function userOffice(role,requested){
  if(role==='Super Admin')return 0;
@@ -100,7 +125,8 @@ entities.post('/:name',async(req,res)=>{
   }
   if(def.invoice){const tag=today().replaceAll('-','');const last=await one(pool,"SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_no FROM '[0-9]+$') AS INTEGER)),0) AS n FROM ib_isp_payments WHERE invoice_no LIKE $1",[`ISP-${tag}-%`]);data.invoice_no=`ISP-${tag}-${String(Number(last.n)+1).padStart(4,'0')}`;}
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');
-  const row=await one(pool,`INSERT INTO ${def.table}(${keys.join(',')}) VALUES(${keys.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,Object.values(data));if(def.secret)delete row.password;res.status(201).json(row);
+  const save=db=>one(db,`INSERT INTO ${def.table}(${keys.join(',')}) VALUES(${keys.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,Object.values(data));
+  const row=req.params.name==='customers'?await saveCustomer(data,null,save):await save(pool);if(def.secret)delete row.password;res.status(201).json(row);
 });
 entities.put('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');const u=req.user;
@@ -124,7 +150,8 @@ entities.put('/:name/:id',async(req,res)=>{
   }
   delete data.invoice_no;
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');
-  const row=await one(pool,`UPDATE ${def.table} SET ${keys.map((k,i)=>`${k}=$${i+1}`).join(',')} WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(data),old.id]);if(def.secret)delete row.password;res.json(row);
+  const save=db=>one(db,`UPDATE ${def.table} SET ${keys.map((k,i)=>`${k}=$${i+1}`).join(',')} WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(data),old.id]);
+  const row=req.params.name==='customers'?await saveCustomer(data,old,save):await save(pool);if(def.secret)delete row.password;res.json(row);
 });
 entities.delete('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');if(def.global||def.secret)onlySuper(req.user);

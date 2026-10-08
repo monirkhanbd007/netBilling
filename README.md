@@ -143,7 +143,7 @@ payment and support numbers from that office's Settings, and customer and bill
 figures from the database. Print on **A4
 portrait** at **100% scale**. Each page contains four customer pairs: four office
 copies and four customer copies, with dashed cut guides. Customers whose total
-bill is zero are omitted.
+bill is zero are included in reports, CSV exports, A4 slips and POS slips.
 
 In **POS Bill Slip**, choose the office, month, and one customer, then select
 **Preview & Print POS Slip**. It opens a separate 80 mm thermal receipt preview.
@@ -184,6 +184,7 @@ Restore saves a `before-restore-*.json` safety copy in `recovery-backups/`, then
 - The plugin's **Reports** menu is only a future-module placeholder; this version implements monthly totals and a downloadable customer report.
 - The plugin's bill slip includes print styling tied to WordPress; this version has browser print/PDF output using the same bill amounts, office information and support number.
 - User and customer operations validate the assigned office and package ownership at the API, including direct calls that bypass the Vue interface.
+- New customers and name changes require a unique customer name within the office, including Bangla names. Comparisons ignore English capitalization and extra spaces and normalize equivalent Unicode text. Mobile numbers can be reused. Existing duplicate records are retained and can still be edited without changing their name; moving a customer to another office checks the name there.
 - An old WordPress installation may contain additional `ib_*` tables created by other plugins or older releases. Unknown tables are ignored by the importer; review them before decommissioning WordPress.
 - The source stores PPPoE passwords as plain text. Imported values stay accessible to authorized users. Plan encryption at rest if the deployment requires it.
 
