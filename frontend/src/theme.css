@@ -133,4 +133,34 @@
     .menu-close { background: #ffffff2e; }
     .menu-button { background: #eff1fb; color: var(--theme-blue); }
   }
+
+  /* Desktop data screens need more than the compact mobile-sized type scale. */
+  @media (min-width: 801px) {
+    h1 { font-size: 30px; letter-spacing: -.03em; }
+    h2 { font-size: 19px; }
+    .eyebrow { font-size: 11px; letter-spacing: .14em; }
+    .muted { font-size: 14px; }
+    .side-brand b { font-size: 16px; }
+    .side-brand small, .side-caption { font-size: 11px; }
+    .nav-item { min-height: 46px; font-size: 14px; }
+    .side-account b { font-size: 14px; }
+    .side-account small, .account-password { font-size: 12px; }
+    .signout { font-size: 13px; }
+    .breadcrumbs { font-size: 13px; }
+    .top-actions { font-size: 12px; }
+    .heading-controls select, .heading-controls input { font-size: 14px; }
+    .metric span, .report-grid span { font-size: 12px; }
+    .metric strong { font-size: 27px; }
+    .metric small { font-size: 12px; }
+    .report-grid strong { font-size: 19px; }
+    table, .slip-preview, .summary-line { font-size: 13px; }
+    th { font-size: 12px; }
+    td small { font-size: 11px; }
+    .tag { font-size: 11px; }
+    .primary, .secondary, .row-actions button, .row-print, .danger-link, .pill { font-size: 13px; }
+    .form-grid label, .settings-form label, .login-card label, .customer-status-filter { font-size: 13px; }
+    .form-grid input, .form-grid select, .form-grid textarea,
+    .toolbar input, .settings-form input, .login-card input,
+    .pos-form select, .customer-status-filter select { font-size: 14px; }
+  }
 }
