@@ -171,7 +171,7 @@ The import runs in one database transaction and refuses to overwrite an occupied
 
 ## Backups and restoring
 
-The **Database Backup** screen downloads a `IBM_PG_V1` JSON snapshot. To restore, stop the app so no writes occur, take a separate database backup, set the environment variables and run:
+The **Database Backup** screen downloads a `IBM_PG_V1` JSON snapshot containing **all offices**. The office selector does not apply to backups. To restore, stop the app so no writes occur, take a separate database backup, set the environment variables and run:
 
 ```bash
 npm run restore -w backend -- /absolute/path/to/internet-business-backup.json --confirm
