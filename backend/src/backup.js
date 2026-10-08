@@ -10,6 +10,25 @@ export async function createBackupSnapshot(db,createdAt=new Date()){
  return output;
 }
 
+export async function createOfficeBackupSnapshot(db,officeId,createdAt=new Date()){
+ await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+ const office=(await db.query('SELECT * FROM ib_offices WHERE id=$1',[officeId])).rows[0];
+ if(!office)return null;
+ const output={format:'IBM_PG_OFFICE_V1',office_id:officeId,office_name:office.office_name,created_at:createdAt.toISOString(),tables:[{key:'ib_offices',rows:[office]}]};
+ for(const name of backupTables.slice(1)){
+  let sql,params=[officeId];
+  if(name==='ib_bill_lines')sql='SELECT * FROM ib_bill_lines WHERE batch_id IN (SELECT id FROM ib_bill_batches WHERE office_id=$1) ORDER BY id';
+  else if(name==='ib_line_transfer'||name==='ib_new_line')sql=`SELECT * FROM ${name} WHERE customer_db_id IN (SELECT id FROM ib_customers WHERE office_id=$1) ORDER BY id`;
+  else if(name==='ib_settings'){
+   sql='SELECT * FROM ib_settings WHERE key=ANY($1::text[]) ORDER BY key';
+   params=[[`support_phone_office_${officeId}`,`payment_numbers_office_${officeId}`,`expense_types_office_${officeId}`]];
+  }
+  else sql=`SELECT * FROM ${name} WHERE office_id=$1 ORDER BY id`;
+  output.tables.push({key:name,rows:(await db.query(sql,params)).rows});
+ }
+ return output;
+}
+
 function encryptionKey(encoded){
  if(!/^[A-Za-z0-9+/]{43}=$/.test(String(encoded||'')))throw Error('BACKUP_ENCRYPTION_KEY must be a base64-encoded 32-byte key.');
  const key=Buffer.from(encoded,'base64');
