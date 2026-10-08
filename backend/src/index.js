@@ -5,7 +5,7 @@ import {authenticate,signIn,signOut,changeOwnPassword,resetUserPassword,onlySupe
 import {entities} from './entities.js';import {finance} from './finance.js';
 import {readSupportPhone,supportPhoneKey} from './support-phone.js';
 import {paymentNumbers,paymentNumbersKey,readPaymentNumbers} from './payment-numbers.js';
-import {createBackupSnapshot} from './backup.js';
+import {createBackupSnapshot,createOfficeBackupSnapshot} from './backup.js';
 import {scheduledBackup,validBackupBearer} from './scheduled-backup.js';
 import {driveFolderId,dueBackupDate,dhakaDateTime,markBackupSuccess,readBackupSchedule,saveBackupSchedule,validBackupFrequency,validBackupMonthDay,validBackupStartDate,validBackupTime,validBackupWeekday} from './backup-schedule.js';
 const app=express();app.disable('x-powered-by');app.set('trust proxy',1);app.use(express.json({limit:'1mb'}));
@@ -46,8 +46,11 @@ app.put('/api/users/:id/password-reset',async(req,res)=>{await resetUserPassword
 app.post('/api/logout',async(req,res)=>{await signOut(req,res);res.json({ok:true});});
 app.use('/api/entities',entities);app.use('/api',finance);
 app.get('/api/backup',async(req,res)=>{onlySuper(req.user);
- const data=await tx(db=>createBackupSnapshot(db));
- res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename="internet-business-all-offices-backup-${new Date().toISOString().slice(0,10)}.json"`,'Cache-Control':'no-store'});res.send(JSON.stringify(data));
+ const selected=req.query.office_id!==undefined,officeId=selected?requireOffice(req.user,req.query.office_id):0;
+ const data=await tx(db=>selected?createOfficeBackupSnapshot(db,officeId):createBackupSnapshot(db));
+ if(!data)fail(404,'Office not found.');
+ const date=new Date().toISOString().slice(0,10),filename=selected?`internet-business-office-${officeId}-backup-${date}.json`:`internet-business-all-offices-backup-${date}.json`;
+ res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename="${filename}"`,'X-Backup-Filename':filename,'Cache-Control':'no-store'});res.send(JSON.stringify(data));
 });
 app.get('/api/backup/schedule',async(req,res)=>{onlySuper(req.user);res.json({...await readBackupSchedule(),server_ready:Boolean(process.env.BACKUP_EXPORT_SECRET?.length>=32&&process.env.BACKUP_ENCRYPTION_KEY)});});
 app.put('/api/backup/schedule',async(req,res)=>{onlySuper(req.user);const {time,frequency='daily',weekday=1,month_day=1,start_date='',folder_id}=req.body||{};if(!validBackupTime(time))fail(400,'Enter a valid backup time (HH:MM).');if(!validBackupFrequency(frequency))fail(400,'Choose daily, weekly, or monthly backups.');if(!validBackupWeekday(weekday))fail(400,'Choose a weekday from Monday to Sunday.');if(!validBackupMonthDay(month_day))fail(400,'Choose a day of the month from 1 to 31.');if(!validBackupStartDate(start_date))fail(400,'Enter a valid start date (YYYY-MM-DD).');if(driveFolderId(folder_id)===null)fail(400,'Enter a Google Drive folder link or folder ID.');res.json(await saveBackupSchedule({time,frequency,weekday,month_day,start_date,folder_id}));});

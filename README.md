@@ -171,17 +171,23 @@ The import runs in one database transaction and refuses to overwrite an occupied
 
 ## Backups and restoring
 
-The **Database Backup** screen downloads a `IBM_PG_V1` JSON snapshot containing **all offices**. The office selector does not apply to backups. To restore, stop the app so no writes occur, take a separate database backup, set the environment variables and run:
+The **Database Backup** screen downloads an `IBM_PG_OFFICE_V1` JSON snapshot for the office selected in the dropdown. It contains that office's users, customers, packages, bills, payments, expenses, salary, transfers, new lines, and office-specific settings. A separate **Download all offices backup** button downloads the original `IBM_PG_V1` snapshot containing every office. To restore an all-offices backup, stop the app so no writes occur, take a separate database backup, set the environment variables and run:
 
 ```bash
 npm run restore -w backend -- /absolute/path/to/internet-business-backup.json --confirm
 ```
 
-Restore saves a `before-restore-*.json` safety copy in `recovery-backups/`, then replaces the business records in a single transaction. Sessions are cleared. Restrict access to these files: they include user password hashes and customer PPPoE credentials. The backup format is not SQL and should only be opened by trusted administrators.
+To restore only one office from its office backup, stop app writes and run:
+
+```bash
+npm run restore-office -w backend -- /absolute/path/to/internet-business-office-N-backup-YYYY-MM-DD.json --office-id N --confirm
+```
+
+The office restore checks the archive's office ID and every table's scope, saves a full-database safety copy in `recovery-backups/`, then replaces only that office's records in one transaction. Other offices and shared settings are left alone. Conflicting IDs or unique values cause a rollback. The all-offices restore likewise creates a `before-restore-*.json` safety copy before replacing business records. Restrict access to these files: they include user password hashes and customer PPPoE credentials. The backup format is not SQL and should only be opened by trusted administrators.
 
 ### Scheduled backups to a personal Google Drive
 
-This uses Google Apps Script under your personal Google account. A Google Cloud OAuth client is not needed. After signing in as a Super Admin, open **Database Backup** to paste a Google Drive folder link or ID and choose **Daily**, **Weekly** (weekday), or **Monthly** (day of month), a start date, and the target time in Bangladesh time. Leave the start date blank to begin immediately; a weekly or monthly rule waits for its next selected day on or after that date. The default remains daily at **01:00**. On a short month, a monthly choice of day 29, 30, or 31 runs on the last day. The folder field may be left blank: the script will use or create an **Internet Business Backups** folder and show a link to it after the first successful backup. The script checks every 15 minutes, so a backup normally arrives after the target time rather than at the exact minute. If a scheduled run was missed, it catches up once later in the same week or month. Manual **Download all offices backup** remains available separately. Both manual and Drive backups include every office; the office selector stays visible for navigation and does not filter backups.
+This uses Google Apps Script under your personal Google account. A Google Cloud OAuth client is not needed. After signing in as a Super Admin, open **Database Backup** to paste a Google Drive folder link or ID and choose **Daily**, **Weekly** (weekday), or **Monthly** (day of month), a start date, and the target time in Bangladesh time. Leave the start date blank to begin immediately; a weekly or monthly rule waits for its next selected day on or after that date. The default remains daily at **01:00**. On a short month, a monthly choice of day 29, 30, or 31 runs on the last day. The folder field may be left blank: the script will use or create an **Internet Business Backups** folder and show a link to it after the first successful backup. The script checks every 15 minutes, so a backup normally arrives after the target time rather than at the exact minute. If a scheduled run was missed, it catches up once later in the same week or month. Scheduled Drive backups still include every office; the office selector controls only the manual office download.
 
 1. Set these **backend** environment variables in Vercel and redeploy the backend. Generate two different values locally:
 

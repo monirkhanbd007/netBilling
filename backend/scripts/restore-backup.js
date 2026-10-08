@@ -4,6 +4,7 @@ import {backupTables as tables,decryptBackup} from '../src/backup.js';
 async function main(){const filename=process.argv[2];if(!filename||process.argv[3]!=='--confirm')throw Error('Usage: npm run restore -w backend -- /path/to/backup.json[.enc] --confirm');
  const input=JSON.parse(await fs.readFile(filename,'utf8'));
  const data=input.format==='IBM_PG_ENCRYPTED_V1'?decryptBackup(input,process.env.BACKUP_ENCRYPTION_KEY):input;
+ if(data.format==='IBM_PG_OFFICE_V1')throw Error('This is an office backup. Use npm run restore-office -w backend -- /path/to/office-backup.json --office-id N --confirm.');
  if(data.format!=='IBM_PG_V1'||!Array.isArray(data.tables)||data.tables.length!==tables.length)throw Error('Invalid PostgreSQL backup format.');
  const map=new Map(data.tables.map(t=>[t.key,t]));if(map.size!==tables.length||tables.some(t=>!Array.isArray(map.get(t)?.rows)))throw Error('Backup tables are incomplete.');
  await setup();const dir=path.resolve('recovery-backups');await fs.mkdir(dir,{recursive:true,mode:0o700});
