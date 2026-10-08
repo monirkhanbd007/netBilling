@@ -35,19 +35,19 @@
 .report-table tfoot th{background:#e5e9ea;color:#000;border-top:2px solid #000;font-size:11px}
 .report-table tfoot th:first-child{text-align:left}
 .report-table .tag.pending{background:#fff0de;color:#000}
-.report-print-pages{display:none}
+.report-print-title{display:none}
 .credential-cell{display:inline-flex;align-items:center;gap:8px}.credential-toggle{border:1px solid #cde3e3;border-radius:7px;background:#eef8f7;color:#137c78;font-size:11px;font-weight:800;min-height:32px;padding:5px 10px}.credential-toggle:hover{background:#dff2f0}
 @page{size:A4 landscape;margin:6mm 6mm 10mm;@bottom-right{content:counter(page) "/" counter(pages);font:10px Arial,sans-serif;color:#000}}
 @media print{
-  .content:has(.report-print-pages)>.heading{display:none}
-  .report-panel>.panel-head,.report-panel>.report-screen-table{display:none}
+  .content:has(.report-panel)>.heading{display:none}
+  .report-panel>.panel-head{display:none}
   .report-panel .report-grid{display:none}
-  .report-print-pages{display:block}
-  .report-print-page:not(:last-child){break-after:page;page-break-after:always}
-  .report-print-heading{padding:0 0 5px;color:#000}
-  .report-print-heading h2{font-size:13px;line-height:1.2;margin:0;color:#000}
-  .report-print-heading p{font-size:8.5px;margin:2px 0 0}
+  .report-panel .table-wrap{overflow:visible}
   .report-table{table-layout:fixed;white-space:normal;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .report-print-title{display:table-row}
+  .report-table .report-print-title th{border:0;background:#fff;text-align:left;padding:0 0 5px;white-space:normal}
+  .report-print-title strong{display:block;font-size:13px;line-height:1.2;color:#000}
+  .report-print-title small{display:block;font-size:8.5px;font-weight:400;margin-top:2px;color:#000}
   .report-table th,.report-table td{padding:2px;font-size:8.5px;line-height:1.08;overflow-wrap:anywhere}
   .report-table .number{white-space:nowrap;overflow-wrap:normal}
   .report-table tfoot th{font-size:8.5px}
@@ -57,14 +57,14 @@
   .report-table tr{break-inside:avoid}
   .report-table thead{display:table-header-group}
   .report-table tfoot{display:table-row-group}
-  .report-table thead th:nth-child(1){width:4%}
-  .report-table thead th:nth-child(2){width:7.5%}
-  .report-table thead th:nth-child(3){width:10%}
-  .report-table thead th:nth-child(4){width:8%}
-  .report-table thead th:nth-child(5){width:12%}
-  .report-table thead th:nth-child(6){width:7.5%}
-  .report-table thead th:nth-child(n+7):nth-child(-n+11){width:9%}
-  .report-table thead th:nth-child(12){width:6%}
+  .report-table .report-columns th:nth-child(1){width:4%}
+  .report-table .report-columns th:nth-child(2){width:7.5%}
+  .report-table .report-columns th:nth-child(3){width:10%}
+  .report-table .report-columns th:nth-child(4){width:8%}
+  .report-table .report-columns th:nth-child(5){width:12%}
+  .report-table .report-columns th:nth-child(6){width:7.5%}
+  .report-table .report-columns th:nth-child(n+7):nth-child(-n+11){width:9%}
+  .report-table .report-columns th:nth-child(12){width:6%}
 }
 
 /* Comfortable controls and navigation on Android and iPhone browsers. */
