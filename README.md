@@ -179,6 +179,33 @@ npm run restore -w backend -- /absolute/path/to/internet-business-backup.json --
 
 Restore saves a `before-restore-*.json` safety copy in `recovery-backups/`, then replaces the business records in a single transaction. Sessions are cleared. Restrict access to these files: they include user password hashes and customer PPPoE credentials. The backup format is not SQL and should only be opened by trusted administrators.
 
+### Daily backups to a personal Google Drive
+
+This uses Google Apps Script under your personal Google account. A Google Cloud OAuth client is not needed. The **Database Backup** page lets a Super Admin change the daily target time (Bangladesh time); the default is **01:00**. The script checks every 15 minutes, so a backup normally arrives after the target time rather than at the exact minute. It creates one encrypted backup per Bangladesh calendar day. Manual **Download backup** remains available separately.
+
+1. Set these **backend** environment variables in Vercel and redeploy the backend. Generate two different values locally:
+
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+   ```
+
+   Use the first value for `BACKUP_EXPORT_SECRET` and the second for `BACKUP_ENCRYPTION_KEY`. Save the encryption key securely outside Google Drive: without it, encrypted backups cannot be restored. Do not put either value in Git.
+
+2. In your Google account, create a standalone project at [Google Apps Script](https://script.google.com/). Paste the contents of [`integrations/google-drive-backup.gs`](integrations/google-drive-backup.gs) into the script editor. Under **Project Settings → Script properties**, set `BACKUP_URL` to your **backend** URL ending in `/api/backup/scheduled`, and `BACKUP_EXPORT_SECRET` to the same value as on Vercel. Use the backend domain, not the frontend domain. Optionally set `DRIVE_FOLDER_ID` to an existing Drive folder ID; otherwise, the script creates an **Internet Business Backups** folder and saves its ID.
+
+3. In Apps Script, run `installDailyBackupTrigger` once and grant the requested permissions. It installs a 15-minute trigger under your Google account; running it again replaces the old trigger rather than adding duplicates. Run `runBackupNow` once to verify the connection immediately. The **Database Backup** page shows the date of the last completed backup. A manual run counts as that day's backup.
+
+4. Change the target time whenever needed in **Database Backup → Backup time → Save backup time**. No Apps Script edit is required. If a backup has already completed today, the new time takes effect the next day. Keep an eye on your Drive storage: this setup retains backups until you delete them yourself.
+
+To restore a `.json.enc` file from Drive, download it, set the original `BACKUP_ENCRYPTION_KEY` in your local environment, stop app writes, and run:
+
+```bash
+npm run restore -w backend -- /absolute/path/to/internet-business-backup-YYYY-MM-DD.json.enc --confirm
+```
+
+The restore tool also accepts the original unencrypted `.json` backups. It writes a safety copy before replacing records.
+
 ## Notes on parity
 
 - The plugin's **Reports** menu is only a future-module placeholder; this version implements monthly totals and a downloadable customer report.
