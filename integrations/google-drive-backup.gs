@@ -2,7 +2,9 @@
 // Google account that should hold the backups. Set BACKUP_URL and
 // BACKUP_EXPORT_SECRET in Project Settings > Script properties before running.
 
-function installDailyBackupTrigger() {
+// The website decides whether a daily, weekly, or monthly backup is due.
+// This trigger only polls the backend every 15 minutes.
+function installBackupTrigger() {
   var properties = PropertiesService.getScriptProperties();
   backupConfiguration(properties);
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
@@ -10,6 +12,9 @@ function installDailyBackupTrigger() {
   });
   ScriptApp.newTrigger('backupToDrive').timeBased().everyMinutes(15).create();
 }
+
+// Keep older setup instructions and existing user scripts working.
+function installDailyBackupTrigger() { installBackupTrigger(); }
 
 function backupConfiguration(properties) {
   var url = properties.getProperty('BACKUP_URL');

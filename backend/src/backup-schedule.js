@@ -8,6 +8,12 @@ export function validBackupTime(value){return typeof value==='string'&&/^([01]\d
 export function validBackupFrequency(value){return ['daily','weekly','monthly'].includes(value);}
 export function validBackupWeekday(value){return Number.isInteger(value)&&value>=1&&value<=7;}
 export function validBackupMonthDay(value){return Number.isInteger(value)&&value>=1&&value<=31;}
+export function validBackupStartDate(value){
+ if(value==='')return true;
+ if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+ const date=new Date(`${value}T12:00:00Z`);
+ return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
 
 export function driveFolderId(value){
  const input=String(value??'').trim();
@@ -32,13 +38,19 @@ const weekStart=date=>{
  day.setUTCDate(day.getUTCDate()-(day.getUTCDay()||7)+1);
  return day.toISOString().slice(0,10);
 };
+const addDays=(date,days)=>{
+ const value=new Date(`${date}T12:00:00Z`);
+ value.setUTCDate(value.getUTCDate()+days);
+ return value.toISOString().slice(0,10);
+};
 
-export function dueBackupDate({now=new Date(),time='01:00',frequency='daily',weekday=1,month_day=1,lastSuccess=null}={}){
+export function dueBackupDate({now=new Date(),time='01:00',frequency='daily',weekday=1,month_day=1,start_date='',lastSuccess=null}={}){
  const local=dhakaDateTime(now);
- if(!validBackupTime(time)||!validBackupFrequency(frequency)||!validBackupWeekday(weekday)||!validBackupMonthDay(month_day))return null;
+ if(!validBackupTime(time)||!validBackupFrequency(frequency)||!validBackupWeekday(weekday)||!validBackupMonthDay(month_day)||!validBackupStartDate(start_date)||local.date<start_date)return null;
  if(frequency==='weekly'){
   const todayWeekday=utcDay(local.date);
   if(todayWeekday<weekday||(todayWeekday===weekday&&local.time<time))return null;
+  if(addDays(weekStart(local.date),weekday-1)<start_date)return null;
   return lastSuccess?.date&&weekStart(lastSuccess.date)===weekStart(local.date)?null:local.date;
  }
  if(frequency==='monthly'){
@@ -46,13 +58,14 @@ export function dueBackupDate({now=new Date(),time='01:00',frequency='daily',wee
   const target=Math.min(month_day,new Date(Date.UTC(year,month,0)).getUTCDate());
   const today=Number(local.date.slice(-2));
   if(today<target||(today===target&&local.time<time))return null;
+  if(`${local.date.slice(0,7)}-${String(target).padStart(2,'0')}`<start_date)return null;
   return lastSuccess?.date?.slice(0,7)===local.date.slice(0,7)?null:local.date;
  }
  if(local.time>=time)return lastSuccess?.date===local.date?null:local.date;
  // A trigger for a late-night target may run just after midnight.
  if(time>='23:30'&&local.time<='00:30'){
   const yesterday=dhakaDateTime(new Date(now.getTime()-86400000)).date;
-  return lastSuccess?.date===yesterday||lastSuccess?.date===local.date?null:yesterday;
+  return yesterday<start_date||lastSuccess?.date===yesterday||lastSuccess?.date===local.date?null:yesterday;
  }
  return null;
 }
@@ -63,17 +76,18 @@ export async function readBackupSchedule(db=pool){
  const rows=(await db.query('SELECT key,value FROM ib_settings WHERE key=ANY($1)',[[scheduleKey,successKey]])).rows;
  const settings=new Map(rows.map(row=>[row.key,row.value]));
  const configured=settings.get(scheduleKey)||{},lastSuccess=settings.get(successKey)||null;
- return {time:validBackupTime(configured.time)?configured.time:'01:00',frequency:validBackupFrequency(configured.frequency)?configured.frequency:'daily',weekday:validBackupWeekday(configured.weekday)?configured.weekday:1,month_day:validBackupMonthDay(configured.month_day)?configured.month_day:1,folder_id:configured.folder_id??lastSuccess?.folder_id??'',timezone:'Asia/Dhaka',last_success:lastSuccess};
+ return {time:validBackupTime(configured.time)?configured.time:'01:00',frequency:validBackupFrequency(configured.frequency)?configured.frequency:'daily',weekday:validBackupWeekday(configured.weekday)?configured.weekday:1,month_day:validBackupMonthDay(configured.month_day)?configured.month_day:1,start_date:validBackupStartDate(configured.start_date)?configured.start_date:'',folder_id:configured.folder_id??lastSuccess?.folder_id??'',timezone:'Asia/Dhaka',last_success:lastSuccess};
 }
 
-export async function saveBackupSchedule({time,frequency='daily',weekday=1,month_day=1,folder_id},db=pool){
+export async function saveBackupSchedule({time,frequency='daily',weekday=1,month_day=1,start_date='',folder_id},db=pool){
  if(!validBackupTime(time))throw Error('Invalid backup time. Use HH:MM.');
  if(!validBackupFrequency(frequency))throw Error('Choose daily, weekly, or monthly backups.');
  if(!validBackupWeekday(weekday))throw Error('Choose a weekday from Monday to Sunday.');
  if(!validBackupMonthDay(month_day))throw Error('Choose a day of the month from 1 to 31.');
+ if(!validBackupStartDate(start_date))throw Error('Enter a valid start date (YYYY-MM-DD).');
  const normalized=driveFolderId(folder_id);
  if(normalized===null)throw Error('Enter a Google Drive folder link or folder ID.');
- await db.query('INSERT INTO ib_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[scheduleKey,JSON.stringify({time,frequency,weekday,month_day,folder_id:normalized})]);
+ await db.query('INSERT INTO ib_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[scheduleKey,JSON.stringify({time,frequency,weekday,month_day,start_date,folder_id:normalized})]);
  return readBackupSchedule(db);
 }
 

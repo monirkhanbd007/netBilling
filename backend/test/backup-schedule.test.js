@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
-import {backupIsDue,dhakaDateTime,driveFolderId,dueBackupDate,readBackupSchedule,saveBackupSchedule,validBackupFrequency,validBackupMonthDay,validBackupTime,validBackupWeekday} from '../src/backup-schedule.js';
+import {backupIsDue,dhakaDateTime,driveFolderId,dueBackupDate,readBackupSchedule,saveBackupSchedule,validBackupFrequency,validBackupMonthDay,validBackupStartDate,validBackupTime,validBackupWeekday} from '../src/backup-schedule.js';
 import {createBackupSnapshot,decryptBackup,encryptBackup} from '../src/backup.js';
 import {validBackupBearer} from '../src/scheduled-backup.js';
 
@@ -55,6 +55,19 @@ test('monthly backups run once per Bangladesh month and clamp short months',()=>
  assert.equal(validBackupMonthDay(32),false);
 });
 
+test('a start date delays daily, weekly, and monthly backups until the next selected day',()=>{
+ const thursday=new Date('2026-10-07T19:12:00Z'); // 8 October in Dhaka
+ assert.equal(dueBackupDate({now:thursday,time:'01:00',start_date:'2026-10-09'}),null);
+ assert.equal(dueBackupDate({now:thursday,time:'01:00',start_date:'2026-10-08'}),'2026-10-08');
+ assert.equal(dueBackupDate({now:new Date('2026-10-08T19:12:00Z'),time:'01:00',frequency:'weekly',weekday:4,start_date:'2026-10-09'}),null);
+ assert.equal(dueBackupDate({now:new Date('2026-10-14T19:12:00Z'),time:'01:00',frequency:'weekly',weekday:4,start_date:'2026-10-09'}),'2026-10-15');
+ assert.equal(dueBackupDate({now:new Date('2026-10-09T19:12:00Z'),time:'01:00',frequency:'monthly',month_day:8,start_date:'2026-10-09'}),null);
+ assert.equal(dueBackupDate({now:new Date('2026-11-07T19:12:00Z'),time:'01:00',frequency:'monthly',month_day:8,start_date:'2026-10-09'}),'2026-11-08');
+ assert.equal(validBackupStartDate('2028-02-29'),true);
+ assert.equal(validBackupStartDate('2027-02-29'),false);
+ assert.equal(validBackupStartDate(''),true);
+});
+
 test('full database snapshot keeps records from every office',async()=>{
  const officeRows=[{id:1,office_name:'Gazipur Network System'},{id:2,office_name:'GNS-2'}];
  const db={async query(sql){
@@ -88,11 +101,12 @@ test('saving a schedule normalizes the Drive link and keeps frequency and target
   return {rows:[...values].map(([key,value])=>({key,value}))};
  }};
  const id='1abCDEFghijkLMNopqrstUVwxyz012345';
- const schedule=await saveBackupSchedule({time:'02:30',frequency:'weekly',weekday:6,month_day:12,folder_id:`https://drive.google.com/drive/folders/${id}?usp=sharing`},db);
+ const schedule=await saveBackupSchedule({time:'02:30',frequency:'weekly',weekday:6,month_day:12,start_date:'2026-10-10',folder_id:`https://drive.google.com/drive/folders/${id}?usp=sharing`},db);
  assert.equal(schedule.time,'02:30');
  assert.equal(schedule.frequency,'weekly');
  assert.equal(schedule.weekday,6);
  assert.equal(schedule.month_day,12);
+ assert.equal(schedule.start_date,'2026-10-10');
  assert.equal(schedule.folder_id,id);
  await assert.rejects(saveBackupSchedule({time:'02:30',frequency:'weekly',weekday:8,folder_id:id},db),/weekday/);
 });
@@ -100,5 +114,5 @@ test('saving a schedule normalizes the Drive link and keeps frequency and target
 test('existing daily schedules keep their defaults after upgrade',async()=>{
  const db={async query(){return {rows:[{key:'daily_google_drive_backup_schedule',value:{time:'03:10',folder_id:''}}]};}};
  const schedule=await readBackupSchedule(db);
- assert.deepEqual([schedule.time,schedule.frequency,schedule.weekday,schedule.month_day],['03:10','daily',1,1]);
+ assert.deepEqual([schedule.time,schedule.frequency,schedule.weekday,schedule.month_day,schedule.start_date],['03:10','daily',1,1,'']);
 });
