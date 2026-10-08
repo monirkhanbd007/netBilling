@@ -5,10 +5,33 @@ import {authenticate,signIn,signOut,changeOwnPassword,resetUserPassword,onlySupe
 import {entities} from './entities.js';import {finance} from './finance.js';
 import {readSupportPhone,supportPhoneKey} from './support-phone.js';
 import {paymentNumbers,paymentNumbersKey,readPaymentNumbers} from './payment-numbers.js';
+import {createBackupSnapshot} from './backup.js';
+import {scheduledBackup,validBackupBearer} from './scheduled-backup.js';
+import {dueBackupDate,dhakaDateTime,markBackupSuccess,readBackupSchedule,saveBackupSchedule,validBackupTime} from './backup-schedule.js';
 const app=express();app.disable('x-powered-by');app.set('trust proxy',1);app.use(express.json({limit:'1mb'}));
 app.use((req,res,next)=>{if(!['GET','HEAD','OPTIONS'].includes(req.method)){const origin=req.headers.origin;const allowed=process.env.APP_ORIGIN||'http://localhost:5173';if(origin&&origin!==allowed&&origin!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'Origin not allowed.'});}next();});
 app.get('/api/health',async(req,res)=>{await pool.query('SELECT 1');res.json({ok:true});});
 app.post('/api/login',async(req,res)=>res.json(await signIn(String(req.body?.username||''),String(req.body?.password||''),res)));
+const requireBackupToken=req=>{if(!validBackupBearer(req.headers.authorization,process.env.BACKUP_EXPORT_SECRET))fail(401,'Backup access denied.');};
+app.get('/api/backup/scheduled',async(req,res)=>{
+ requireBackupToken(req);
+ if(!process.env.BACKUP_ENCRYPTION_KEY)fail(503,'Backup encryption is not configured.');
+ const now=new Date(),schedule=await readBackupSchedule();
+ res.set('Cache-Control','no-store');
+ const backupDate=req.query.force==='1'?dhakaDateTime(now).date:dueBackupDate({now,time:schedule.time,lastSuccess:schedule.last_success});
+ if(!backupDate)return res.status(204).end();
+ const {filename,bytes}=await scheduledBackup({now,backupDate});
+ res.set({'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="${filename}"`,'X-Backup-Filename':filename,'X-Backup-Date':backupDate});
+ res.send(bytes);
+});
+app.post('/api/backup/scheduled/ack',async(req,res)=>{
+ requireBackupToken(req);
+ const {date,file_id,filename}=req.body||{};
+ const now=new Date(),allowedDates=[dhakaDateTime(now).date,dhakaDateTime(new Date(now.getTime()-86400000)).date];
+ if(!allowedDates.includes(date)||typeof file_id!=='string'||!/^[A-Za-z0-9_-]{10,200}$/.test(file_id)||filename!==`internet-business-backup-${date}.json.enc`)fail(400,'Invalid backup confirmation.');
+ await markBackupSuccess({date,file_id,filename});
+ res.json({ok:true});
+});
 app.use('/api',authenticate);
 app.use('/api',(req,res,next)=>{
  if(!paymentCollector(req.user))return next();
@@ -21,10 +44,12 @@ app.put('/api/me/password',async(req,res)=>{await changeOwnPassword(req.user,Str
 app.put('/api/users/:id/password-reset',async(req,res)=>{await resetUserPassword(req.user,req.params.id,String(req.body?.new_password??''));res.json({ok:true});});
 app.post('/api/logout',async(req,res)=>{await signOut(req,res);res.json({ok:true});});
 app.use('/api/entities',entities);app.use('/api',finance);
-app.get('/api/backup',async(req,res)=>{onlySuper(req.user);const tables=['ib_offices','ib_users','ib_packages','ib_customers','ib_bill_batches','ib_bill_lines','ib_payments','ib_isp_payments','ib_office_expenses','ib_staff_salary','ib_line_transfer','ib_new_line','ib_settings'];
- const data=await tx(async db=>{await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');const output={format:'IBM_PG_V1',created_at:new Date().toISOString(),tables:[]};for(const name of tables)output.tables.push({key:name,rows:(await db.query(`SELECT * FROM ${name} ORDER BY ${name==='ib_settings'?'key':'id'}`)).rows});return output;});
+app.get('/api/backup',async(req,res)=>{onlySuper(req.user);
+ const data=await tx(db=>createBackupSnapshot(db));
  res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename="internet-business-backup-${new Date().toISOString().slice(0,10)}.json"`,'Cache-Control':'no-store'});res.send(JSON.stringify(data));
 });
+app.get('/api/backup/schedule',async(req,res)=>{onlySuper(req.user);res.json({...await readBackupSchedule(),server_ready:Boolean(process.env.BACKUP_EXPORT_SECRET?.length>=32&&process.env.BACKUP_ENCRYPTION_KEY)});});
+app.put('/api/backup/schedule',async(req,res)=>{onlySuper(req.user);const time=req.body?.time;if(!validBackupTime(time))fail(400,'Enter a valid backup time (HH:MM).');res.json(await saveBackupSchedule(time));});
 const settingsOffice=async(u,requested)=>{const id=requireOffice(u,scope(u,requested));if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(404,'Office not found.');return id;};
 app.get('/api/settings',async(req,res)=>{const officeId=await settingsOffice(req.user,req.query.office_id);const [support,numbers]=await Promise.all([readSupportPhone(pool,officeId),readPaymentNumbers(pool,officeId)]);res.json({office_id:officeId,...support,payment_numbers:numbers});});
 app.put('/api/settings',async(req,res)=>{onlySuper(req.user);const officeId=await settingsOffice(req.user,req.body?.office_id),value=String(req.body?.support_phone??'').trim(),numbers=paymentNumbers(req.body?.payment_numbers);if(!value||value.length>50)fail(400,'Enter a support phone number of up to 50 characters.');if(Object.values(numbers).some(number=>number.length>25))fail(400,'Payment numbers must be 25 characters or fewer.');await tx(async db=>{await db.query('INSERT INTO ib_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[supportPhoneKey(officeId),JSON.stringify(value)]);await db.query('INSERT INTO ib_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[paymentNumbersKey(officeId),JSON.stringify(numbers)]);});res.json({office_id:officeId,value,inherited:false,payment_numbers:numbers});});

@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {fileURLToPath} from 'node:url';
 import {pool,tx,one} from '../src/db.js';import {setup} from './init.js';
-const tables=['ib_offices','ib_users','ib_packages','ib_customers','ib_bill_batches','ib_bill_lines','ib_payments','ib_isp_payments','ib_office_expenses','ib_staff_salary','ib_line_transfer','ib_new_line','ib_settings'];
-async function main(){const filename=process.argv[2];if(!filename||process.argv[3]!=='--confirm')throw Error('Usage: npm run restore -w server -- /path/to/backup.json --confirm');
- const data=JSON.parse(await fs.readFile(filename,'utf8'));if(data.format!=='IBM_PG_V1'||!Array.isArray(data.tables)||data.tables.length!==tables.length)throw Error('Invalid PostgreSQL backup format.');
+import {backupTables as tables,decryptBackup} from '../src/backup.js';
+async function main(){const filename=process.argv[2];if(!filename||process.argv[3]!=='--confirm')throw Error('Usage: npm run restore -w backend -- /path/to/backup.json[.enc] --confirm');
+ const input=JSON.parse(await fs.readFile(filename,'utf8'));
+ const data=input.format==='IBM_PG_ENCRYPTED_V1'?decryptBackup(input,process.env.BACKUP_ENCRYPTION_KEY):input;
+ if(data.format!=='IBM_PG_V1'||!Array.isArray(data.tables)||data.tables.length!==tables.length)throw Error('Invalid PostgreSQL backup format.');
  const map=new Map(data.tables.map(t=>[t.key,t]));if(map.size!==tables.length||tables.some(t=>!Array.isArray(map.get(t)?.rows)))throw Error('Backup tables are incomplete.');
  await setup();const dir=path.resolve('recovery-backups');await fs.mkdir(dir,{recursive:true,mode:0o700});
  const safePath=path.join(dir,`before-restore-${new Date().toISOString().replace(/[:.]/g,'-')}.json`);
