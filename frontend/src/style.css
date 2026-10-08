@@ -85,3 +85,50 @@ tbody tr.inactive-customer-row:hover{background:#eae2f5}
 .inactive-customer-row td:first-child{box-shadow:inset 3px 0 #9070b3}
 .inactive-customer-row .tag.inactive{background:#e5d9f3;color:#623c82}
 @media screen and (max-width:600px){.customer-filters input{flex:1 1 100%;max-width:none}.customer-status-filter{width:100%}.customer-status-filter select{flex:1;min-width:0;font-size:16px;min-height:44px}}
+
+/* Clearer navigation on desktop and in the mobile drawer. */
+.sidebar{
+  width:268px;
+  background:linear-gradient(180deg,#10333e 0%,#0b2633 58%,#091f2b 100%);
+  border-right:1px solid #ffffff18;
+  box-shadow:5px 0 24px #0b26331a;
+}
+.side-brand{padding:0 18px;border-bottom-color:#ffffff22}
+.side-brand b{font-size:15px;line-height:1.25}
+.side-brand small{font-size:9px;color:#aac9d0;letter-spacing:.12em}
+.side-scroll{padding:19px 11px;scrollbar-color:#61838d transparent;scrollbar-width:thin}
+.side-scroll section{margin-bottom:22px}
+.side-caption{margin:0 12px 9px;color:#a9c3ca;font-size:10px;letter-spacing:.15em}
+.nav-item{
+  min-height:44px;
+  gap:12px;
+  padding:10px 12px;
+  border-radius:9px;
+  color:#e0edf0;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.35;
+}
+.nav-item:hover{background:#ffffff1d;color:#fff}
+.nav-item.selected{
+  background:#156d72;
+  color:#fff;
+  box-shadow:inset 3px 0 #64e6d9,0 3px 10px #00182128;
+}
+.nav-dot{flex:none;width:8px;height:8px;border-color:#9ab7bf}
+.selected .nav-dot{background:#a4fff2;border-color:#a4fff2;box-shadow:0 0 0 3px #b5fff029}
+.side-account{padding:15px 12px;border-top-color:#ffffff27}
+.side-account b{font-size:13px}
+.side-account small{font-size:11px;color:#b1c9cf}
+.account-password{font-size:12px;font-weight:700;color:#88f0e5}
+.signout{min-height:42px;padding:9px 12px;font-size:13px}
+.nav-item:focus-visible,.menu-button:focus-visible,.menu-close:focus-visible,.account-password:focus-visible,.signout:focus-visible{outline:2px solid #91f4e9;outline-offset:2px}
+@media screen and (min-width:801px) and (max-width:1200px){.sidebar{width:240px}}
+@media screen and (max-width:800px){
+  .sidebar{width:min(310px,calc(100vw - 40px))}
+  .side-brand{padding:0 14px}
+  .nav-item{min-height:48px;font-size:14px}
+  .menu-button{display:grid;place-items:center;min-width:44px;min-height:44px;border-radius:9px;background:#e9f7f5;color:#126c70}
+  .menu-button:hover{background:#d6efeb}
+  .menu-close{background:#ffffff27}
+}
