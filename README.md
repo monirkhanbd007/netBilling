@@ -181,7 +181,7 @@ Restore saves a `before-restore-*.json` safety copy in `recovery-backups/`, then
 
 ### Daily backups to a personal Google Drive
 
-This uses Google Apps Script under your personal Google account. A Google Cloud OAuth client is not needed. The **Database Backup** page lets a Super Admin change the daily target time (Bangladesh time); the default is **01:00**. The script checks every 15 minutes, so a backup normally arrives after the target time rather than at the exact minute. It creates one encrypted backup per Bangladesh calendar day. Manual **Download backup** remains available separately.
+This uses Google Apps Script under your personal Google account. A Google Cloud OAuth client is not needed. After signing in as a Super Admin, open **Database Backup** to paste a Google Drive folder link or ID and change the daily target time (Bangladesh time); the default is **01:00**. The folder field may be left blank: the script will use or create an **Internet Business Backups** folder and show a link to it after the first successful backup. The script checks every 15 minutes, so a backup normally arrives after the target time rather than at the exact minute. It creates one encrypted backup per Bangladesh calendar day. Manual **Download backup** remains available separately.
 
 1. Set these **backend** environment variables in Vercel and redeploy the backend. Generate two different values locally:
 
@@ -192,11 +192,13 @@ This uses Google Apps Script under your personal Google account. A Google Cloud 
 
    Use the first value for `BACKUP_EXPORT_SECRET` and the second for `BACKUP_ENCRYPTION_KEY`. Save the encryption key securely outside Google Drive: without it, encrypted backups cannot be restored. Do not put either value in Git.
 
-2. In your Google account, create a standalone project at [Google Apps Script](https://script.google.com/). Paste the contents of [`integrations/google-drive-backup.gs`](integrations/google-drive-backup.gs) into the script editor. Under **Project Settings → Script properties**, set `BACKUP_URL` to your **backend** URL ending in `/api/backup/scheduled`, and `BACKUP_EXPORT_SECRET` to the same value as on Vercel. Use the backend domain, not the frontend domain. Optionally set `DRIVE_FOLDER_ID` to an existing Drive folder ID; otherwise, the script creates an **Internet Business Backups** folder and saves its ID.
+2. In your Google account, create a standalone project at [Google Apps Script](https://script.google.com/). Paste the contents of [`integrations/google-drive-backup.gs`](integrations/google-drive-backup.gs) into the script editor. Under **Project Settings → Script properties**, set `BACKUP_URL` to your **backend** URL ending in `/api/backup/scheduled`, and `BACKUP_EXPORT_SECRET` to the same value as on Vercel. Use the backend domain, not the frontend domain. This is a one-time Google authorization; do not enter your Google password in the billing site. The Drive folder destination and schedule are set later in the billing site, not in Script properties.
 
 3. In Apps Script, run `installDailyBackupTrigger` once and grant the requested permissions. It installs a 15-minute trigger under your Google account; running it again replaces the old trigger rather than adding duplicates. Run `runBackupNow` once to verify the connection immediately. The **Database Backup** page shows the date of the last completed backup. A manual run counts as that day's backup.
 
-4. Change the target time whenever needed in **Database Backup → Backup time → Save backup time**. No Apps Script edit is required. If a backup has already completed today, the new time takes effect the next day. Keep an eye on your Drive storage: this setup retains backups until you delete them yourself.
+   If you copied an earlier version of the script, replace it with the current file before testing the in-site folder setting.
+
+4. After signing in to the billing site as a Super Admin, open **Database Backup**. Paste the link or ID of a Drive folder accessible to the Google account running the script, or leave it blank for an automatically created folder. Choose the time, then click **Save Drive folder and time**. You can change both later without editing Apps Script. If a backup has already completed today, the new destination or time takes effect on the next daily backup; run `runBackupNow` in Apps Script if you want to test it sooner. Keep an eye on your Drive storage: this setup retains backups until you delete them yourself.
 
 To restore a `.json.enc` file from Drive, download it, set the original `BACKUP_ENCRYPTION_KEY` in your local environment, stop app writes, and run:
 
