@@ -57,14 +57,14 @@
   .report-table tr{break-inside:avoid}
   .report-table thead{display:table-header-group}
   .report-table tfoot{display:table-row-group}
-  .report-table .report-columns th:nth-child(1){width:4%}
-  .report-table .report-columns th:nth-child(2){width:7.5%}
-  .report-table .report-columns th:nth-child(3){width:10%}
-  .report-table .report-columns th:nth-child(4){width:8%}
-  .report-table .report-columns th:nth-child(5){width:12%}
-  .report-table .report-columns th:nth-child(6){width:7.5%}
-  .report-table .report-columns th:nth-child(n+7):nth-child(-n+11){width:9%}
-  .report-table .report-columns th:nth-child(12){width:6%}
+  .report-table col:nth-child(1){width:4%}
+  .report-table col:nth-child(2){width:8%}
+  .report-table col:nth-child(3){width:10%}
+  .report-table col:nth-child(4){width:8%}
+  .report-table col:nth-child(5){width:22%}
+  .report-table col:nth-child(6){width:8%}
+  .report-table col:nth-child(n+7):nth-child(-n+11){width:7%}
+  .report-table col:nth-child(12){width:5%}
 }
 
 /* Comfortable controls and navigation on Android and iPhone browsers. */
