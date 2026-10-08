@@ -4,7 +4,7 @@ async function showSlips() {
   const params=new URLSearchParams(window.location.search);
   const officeId=params.get('office_id'),month=params.get('month');
   if(!/^\d+$/.test(officeId||'')||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw Error('অফিস বা মাস নির্বাচন ঠিক নেই।');
-  const response=await fetch(`/api/slips?office_id=${encodeURIComponent(officeId)}&month=${encodeURIComponent(month)}`,{credentials:'same-origin'});
+  const response=await fetch(`/api/slips?office_id=${encodeURIComponent(officeId)}&month=${encodeURIComponent(month)}&active_only=1`,{credentials:'same-origin'});
   if(!response.ok)throw Error(response.status===401?'সেশন শেষ হয়েছে। আবার লগইন করুন।':'বিল স্লিপ লোড করা যায়নি।');
   const slips=await response.json();
   if(!printableSlipRows(slips).length)throw Error('এই মাসে ছাপানোর মতো বিল স্লিপ নেই।');
