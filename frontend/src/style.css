@@ -114,6 +114,12 @@ tbody tr.inactive-customer-row:hover{background:#eae2f5}
 .inactive-customer-row .tag.inactive{background:#e5d9f3;color:#623c82}
 @media screen and (max-width:600px){.customer-filters input{flex:1 1 100%;max-width:none}.customer-status-filter{width:100%}.customer-status-filter select{flex:1;min-width:0;font-size:16px;min-height:44px}}
 
+.payment-history-tools{display:flex;align-items:center;gap:10px;min-width:0}
+.payment-history-tools input{width:min(310px,100%);min-height:38px;padding:9px 11px;border:1px solid #dae5e9;border-radius:8px;background:#fff;color:#213d4b;font-size:12px}
+.payment-history-tools input:focus-visible{outline:2px solid #7650d1;outline-offset:1px}
+.payment-history-tools small{color:#718391;font-size:11px;white-space:nowrap}
+@media screen and (max-width:600px){.payment-history-head{align-items:stretch}.payment-history-tools{width:100%;flex-wrap:wrap}.payment-history-tools input{width:100%;min-height:44px;font-size:16px}}
+
 /* Clearer navigation on desktop and in the mobile drawer. */
 .sidebar{
   width:268px;
