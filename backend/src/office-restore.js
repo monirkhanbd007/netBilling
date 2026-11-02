@@ -1,7 +1,7 @@
 import {backupTables} from './backup.js';
 
 const directOfficeTables=['ib_users','ib_packages','ib_customers','ib_bill_batches','ib_payments','ib_isp_payments','ib_office_expenses','ib_staff_salary'];
-const officeSettings=id=>[`support_phone_office_${id}`,`payment_numbers_office_${id}`,`expense_types_office_${id}`];
+const officeSettings=id=>[`support_phone_office_${id}`,`payment_numbers_office_${id}`,`expense_types_office_${id}`,`customer_billing_status_office_${id}`];
 const sameId=(left,right)=>String(left)===String(right);
 
 export function validateOfficeBackupSnapshot(data,officeId){

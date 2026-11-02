@@ -9,6 +9,8 @@ test('Monthly Bill Sheet returns live and processed rows in numeric Customer ID 
  let processed=false;
  pool.query=async(sql)=>{
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,name:'Admin',username:'admin',role:'Super Admin',office_id:0}]};
+  if(sql.includes('FROM ib_settings'))return {rows:[]};
+  if(sql.startsWith('SELECT id,status FROM ib_customers'))return {rows:customers};
   if(sql.includes('SELECT * FROM ib_bill_batches WHERE office_id='))return {rows:processed?[{id:9,office_id:4,bill_month:'2026-09'}]:[]};
   if(sql.includes('FROM ib_bill_batches WHERE office_id=')&&sql.includes('bill_month<$2'))return {rows:[]};
   if(sql.includes('SELECT * FROM ib_customers WHERE office_id='))return {rows:customers};

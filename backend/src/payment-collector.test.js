@@ -7,6 +7,7 @@ test('payment collector sees allowed offices and balances but not customer crede
  const original=pool.query;
  pool.query=async(sql)=>{
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,name:'Collector',username:'collector',role:'Payment Collector',office_id:0}]};
+  if(sql.includes('FROM ib_settings'))return {rows:[]};
   if(sql.includes('FROM ib_offices')&&sql.includes('ORDER BY id DESC'))return {rows:[{id:4,office_name:'GNS-2'},{id:5,office_name:'Gazipur'}]};
   if(sql.includes('FROM ib_bill_batches'))return {rows:[]};
   if(sql.includes('SELECT * FROM ib_customers WHERE office_id='))return {rows:[{id:11,office_id:4,customer_id:'gns401',customer_name:'Example',pppoe_username:'router-user',pppoe_password:'secret',monthly_bill:'600.00',previous_due:'0.00',status:'active'}]};

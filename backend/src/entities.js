@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import {Router} from 'express';
 import {pool,tx,one,all,fail,money,month,date,today} from './db.js';
 import {scope,requireOffice,onlySuper,superAdmin,allOfficeAccess} from './auth.js';
+import {readBillingStatus,recordBillingStatus,statusEffectiveMonth} from './customer-billing-status.js';
 
 const definitions={
  offices:{table:'ib_offices',fields:['office_name','address','phone','manager','status'],required:['office_name'],global:true},
@@ -22,7 +23,7 @@ const customerName=value=>{
  return name;
 };
 const customerNameKey=value=>String(value??'').normalize('NFC').trim().replace(/\s+/gu,' ').toLowerCase();
-async function saveCustomer(data,old,save){
+async function saveCustomer(data,old,save,effectiveMonth){
  return tx(async db=>{
   // Serialize customer saves in this office so simultaneous requests cannot
   // both pass the duplicate check before either customer is written.
@@ -37,7 +38,9 @@ async function saveCustomer(data,old,save){
    const customers=await all(db,'SELECT id,customer_name FROM ib_customers WHERE office_id=$1',[data.office_id]);
    if(customers.some(row=>String(row.id)!==String(current?.id)&&customerNameKey(row.customer_name)===name))fail(409,'A customer with this name already exists in this office. Enter a different name.');
   }
-  return save(db);
+  const row=await save(db);
+  row.status_month=await recordBillingStatus(db,row,current,effectiveMonth);
+  return row;
  });
 }
 const knownOffice=async(id)=>{if(!await one(pool,'SELECT id FROM ib_offices WHERE id=$1',[id]))fail(400,'Office does not exist.');};
@@ -97,7 +100,12 @@ entities.get('/:name',async(req,res)=>{
     where+=(where?' AND ':'WHERE ')+`bill_month=$${params.length}`;
   }
   const order=req.params.name==='customers'?"CASE WHEN customer_id ~* '^gns[0-9]{1,12}$' THEN 0 ELSE 1 END,CASE WHEN customer_id ~* '^gns[0-9]{1,12}$' THEN SUBSTRING(customer_id FROM 4)::BIGINT END,customer_id,id":'id DESC';
-  const rows=await all(pool,`SELECT ${def.secret?'id,office_id,name,username,role,status,created_date':'*'} FROM ${def.table} ${where} ORDER BY ${order} LIMIT 2000`,params);res.json(rows);
+  const rows=await all(pool,`SELECT ${def.secret?'id,office_id,name,username,role,status,created_date':'*'} FROM ${def.table} ${where} ORDER BY ${order} LIMIT 2000`,params);
+  if(req.params.name==='customers'){
+   const histories=new Map(await Promise.all([...new Set(rows.map(row=>row.office_id))].map(async id=>[id,await readBillingStatus(pool,id)])));
+   for(const row of rows)row.status_month=statusEffectiveMonth(row,histories.get(row.office_id));
+  }
+  res.json(rows);
 });
 entities.post('/:name',async(req,res)=>{
   const def=definitions[req.params.name];if(!def)fail(404,'Unknown module.');const u=req.user,b=req.body||{};
@@ -126,7 +134,7 @@ entities.post('/:name',async(req,res)=>{
   if(def.invoice){const tag=today().replaceAll('-','');const last=await one(pool,"SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_no FROM '[0-9]+$') AS INTEGER)),0) AS n FROM ib_isp_payments WHERE invoice_no LIKE $1",[`ISP-${tag}-%`]);data.invoice_no=`ISP-${tag}-${String(Number(last.n)+1).padStart(4,'0')}`;}
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');
   const save=db=>one(db,`INSERT INTO ${def.table}(${keys.join(',')}) VALUES(${keys.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,Object.values(data));
-  const row=req.params.name==='customers'?await saveCustomer(data,null,save):await save(pool);if(def.secret)delete row.password;res.status(201).json(row);
+  const row=req.params.name==='customers'?await saveCustomer(data,null,save,b.status_month):await save(pool);if(def.secret)delete row.password;res.status(201).json(row);
 });
 entities.put('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');const u=req.user;
@@ -151,7 +159,7 @@ entities.put('/:name/:id',async(req,res)=>{
   delete data.invoice_no;
   const keys=Object.keys(data);if(!keys.length)fail(400,'No fields provided.');
   const save=db=>one(db,`UPDATE ${def.table} SET ${keys.map((k,i)=>`${k}=$${i+1}`).join(',')} WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(data),old.id]);
-  const row=req.params.name==='customers'?await saveCustomer(data,old,save):await save(pool);if(def.secret)delete row.password;res.json(row);
+  const row=req.params.name==='customers'?await saveCustomer(data,old,save,b.status_month):await save(pool);if(def.secret)delete row.password;res.json(row);
 });
 entities.delete('/:name/:id',async(req,res)=>{
   const def=definitions[req.params.name];if(!def||def.append)fail(404,'Unknown module.');if(def.global||def.secret)onlySuper(req.user);

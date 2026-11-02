@@ -12,8 +12,11 @@ test('customer names are unique within an office, including Bangla and simultane
   [4,{id:4,office_id:4,customer_id:'legacy',customer_name:'Monir Khan',mobile:'01700000000'}]
  ]);
  let nextId=5,actorOffice=0;
+ const billingHistories=new Map();
  const locks=new Map(),transactions=[];
  const query=async(sql,params=[])=>{
+  if(sql==='SELECT value FROM ib_settings WHERE key=$1')return {rows:billingHistories.has(params[0])?[{value:structuredClone(billingHistories.get(params[0]))}]:[]};
+  if(sql.startsWith('INSERT INTO ib_settings')){billingHistories.set(params[0],JSON.parse(params[1]));return {rows:[]};}
   if(sql.startsWith('SELECT u.id,u.name,u.username,u.role,u.office_id FROM ib_sessions'))return {rows:[{id:10,role:actorOffice?'Office Admin':'Super Admin',office_id:actorOffice}]};
   if(sql==='SELECT id FROM ib_offices WHERE id=$1')return {rows:[{id:params[0]}]};
   if(sql==='SELECT * FROM ib_customers WHERE id=$1'||sql==='SELECT * FROM ib_customers WHERE id=$1 FOR UPDATE')return {rows:customers.has(Number(params[0]))?[{...customers.get(Number(params[0]))}]:[]};
@@ -95,6 +98,14 @@ test('customer names are unique within an office, including Bangla and simultane
  assert.equal((await add({customer_name:'   '})).status,400);
  assert.equal((await add({customer_name:123})).status,400);
  assert.equal((await add({customer_name:'ক'.repeat(151)})).status,400);
+ const inactive=await request('PUT',{status:'inactive',status_month:'2000-10'},1);
+ assert.equal(inactive.status,200);
+ assert.equal((await inactive.json()).status_month,'2000-10');
+ assert.deepEqual(billingHistories.get('customer_billing_status_office_5').customers['1'].changes,[{month:'2000-10',status:'inactive'}]);
+ assert.equal((await request('PUT',{mobile:'01712345678'},1)).status,200);
+ assert.equal(billingHistories.get('customer_billing_status_office_5').customers['1'].changes.length,1);
+ assert.equal((await request('PUT',{status:'active',status_month:'2001-01'},1)).status,200);
+ assert.deepEqual(billingHistories.get('customer_billing_status_office_5').customers['1'].changes,[{month:'2000-10',status:'inactive'},{month:'2001-01',status:'active'}]);
  assert.ok(transactions.includes('ROLLBACK'));
  assert.ok(transactions.includes('COMMIT'));
 });

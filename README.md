@@ -14,7 +14,7 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 
 | Rule | Implementation |
 | --- | --- |
-| Monthly bill | One processed snapshot per office/month, generated for active customers only. The next month uses each active customer's remaining balance from the latest earlier processed bill as `previous_due`; a customer without an earlier bill keeps the entered opening due. `total_due = monthly_bill + previous_due`. Inactive customers are excluded from new bills and the collection pending list, including already processed months. Existing historical bill lines are retained. |
+| Monthly bill | One processed snapshot per office/month, generated for customers active in that bill month. The next month uses each active customer's remaining balance from the latest earlier processed bill as `previous_due`; a customer without an earlier bill keeps the entered opening due. `total_due = monthly_bill + previous_due`. A customer's status applies from the **Status effective from** month: earlier bills, reports, slips and payment details remain visible; inactive months are excluded from billing and the pending collection list. |
 | Collections | Partial payments reduce balance; methods: Cash, bKash, Nagad, Rocket, Bank, Other. Payments can be reversed. |
 | Dashboard due | `max(0, active customer monthly bill − received customer payments for selected month)`. |
 | Dashboard net | `received customer payments − ISP bill − office expenses − staff salary`. |
@@ -22,6 +22,8 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 | Office permissions | Super Admin sees all offices; other accounts are restricted to their own office. |
 
 **Data consistency adjustment:** Payments collected before a month's bill is processed are attached to that bill snapshot when it is processed. After a later month is processed, collect any carried balance against that later month's bill. Earlier payments and bills cannot be reversed until the later bill is reversed, and a processed bill cannot be reversed while it still has linked payments. This prevents double-counting carried balances.
+
+Customer status changes are recorded by month in office-specific settings and included in full and office backups. Reactivation keeps the earlier inactive months intact. Existing inactive customers have **November 2026** as their starting inactive month, as confirmed by the owner; correct **Status effective from** in customer editing where needed. Status dates affect visibility and new processing; saved bill amounts and payment history remain unchanged. No database schema migration is required.
 
 ## Requirements
 

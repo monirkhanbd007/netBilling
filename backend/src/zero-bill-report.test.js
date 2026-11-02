@@ -13,6 +13,7 @@ test('live and processed reports and slips include zero bills with accurate tota
  ].map(row=>({...row,office_id:4,status:'active',address:'Address '+row.id,pppoe_username:'user'+row.id,pppoe_password:'secret'}));
  const selected=()=>onlyZero?[customers[1]]:customers;
  pool.query=async(sql,params=[])=>{
+  if(sql.startsWith('SELECT id,status FROM ib_customers'))return {rows:customers};
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,role:'Super Admin',office_id:0}]};
   if(sql==='SELECT * FROM ib_offices WHERE id=$1')return {rows:[{id:4,office_name:'GNS-2'}]};
   if(sql.startsWith('SELECT * FROM ib_bill_batches'))return {rows:processed?[{id:9}]:[]};
@@ -65,7 +66,7 @@ test('live and processed reports and slips include zero bills with accurate tota
  }
 });
 
-test('274 customers with two inactive zero bills produce 272 report and A4 slip rows',async t=>{
+test('274 customers with two inactive zero bills produce 272 report and A4 slip rows in the inactive month',async t=>{
  const originalQuery=pool.query;
  let processed=false;
  const customers=Array.from({length:274},(_,index)=>({
@@ -73,6 +74,7 @@ test('274 customers with two inactive zero bills produce 272 report and A4 slip 
   monthly_bill:index<265?'600.00':'0.00',previous_due:'0.00',status:index<272?'active':'inactive'
  }));
  pool.query=async(sql)=>{
+  if(sql.startsWith('SELECT id,status FROM ib_customers'))return {rows:customers};
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,role:'Super Admin',office_id:0}]};
   if(sql==='SELECT * FROM ib_offices WHERE id=$1')return {rows:[{id:4,office_name:'GNS-2'}]};
   if(sql.startsWith('SELECT * FROM ib_bill_batches'))return {rows:processed?[{id:9}]:[]};
@@ -92,7 +94,7 @@ test('274 customers with two inactive zero bills produce 272 report and A4 slip 
  await new Promise(resolve=>server.once('listening',resolve));
  t.after(async()=>{pool.query=originalQuery;await new Promise(resolve=>server.close(resolve));});
  const get=async(path,extra='')=>{
-  const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}?office_id=4&month=2026-10${extra}`,{headers:{Cookie:'ibm_session=test'}});
+  const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}?office_id=4&month=2026-11${extra}`,{headers:{Cookie:'ibm_session=test'}});
   assert.equal(response.status,200);
   return response.json();
  };

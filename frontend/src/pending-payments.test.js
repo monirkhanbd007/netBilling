@@ -35,9 +35,12 @@ test('payment collector can use active status from bill data without customer cr
   assert.deepEqual(pendingBillCustomers(bill, [], 4, '2026-09').map(row => row.customer_db_id), [1]);
 });
 
-test('current inactive status overrides an active status in an older bill response', () => {
+test('previous-month bill status keeps historical pending bills available after inactivation', () => {
   const bill = {office_id: 4, month: '2026-10', batch: {id: 9}, rows: [
     {customer_db_id: 3, balance_due: '300.00', customer_status: 'active'}
   ]};
-  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-10'), []);
+  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-10').map(row=>row.customer_db_id), [3]);
+  bill.month='2026-11';
+  bill.rows[0].customer_status='inactive';
+  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-11'), []);
 });

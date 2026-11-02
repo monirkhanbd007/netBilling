@@ -21,7 +21,7 @@ export async function createOfficeBackupSnapshot(db,officeId,createdAt=new Date(
   else if(name==='ib_line_transfer'||name==='ib_new_line')sql=`SELECT * FROM ${name} WHERE customer_db_id IN (SELECT id FROM ib_customers WHERE office_id=$1) ORDER BY id`;
   else if(name==='ib_settings'){
    sql='SELECT * FROM ib_settings WHERE key=ANY($1::text[]) ORDER BY key';
-   params=[[`support_phone_office_${officeId}`,`payment_numbers_office_${officeId}`,`expense_types_office_${officeId}`]];
+   params=[[`support_phone_office_${officeId}`,`payment_numbers_office_${officeId}`,`expense_types_office_${officeId}`,`customer_billing_status_office_${officeId}`]];
   }
   else sql=`SELECT * FROM ${name} WHERE office_id=$1 ORDER BY id`;
   output.tables.push({key:name,rows:(await db.query(sql,params)).rows});

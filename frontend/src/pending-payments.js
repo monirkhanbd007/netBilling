@@ -6,5 +6,5 @@ export function pendingBillCustomers(bill, customers, officeId, month) {
     .map(customer => [Number(customer.id), customer.status]));
 
   return (bill.rows ?? []).filter(row => Number(row.balance_due) > 0 &&
-    (customerStatuses.get(Number(row.customer_db_id)) ?? row.customer_status) === 'active');
+    (row.customer_status ?? customerStatuses.get(Number(row.customer_db_id))) === 'active');
 }

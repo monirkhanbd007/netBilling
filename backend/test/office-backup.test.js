@@ -16,7 +16,7 @@ const records={
  ib_staff_salary:[{id:9,office_id:1},{id:10,office_id:2}],
  ib_line_transfer:[{id:13,customer_db_id:111},{id:14,customer_db_id:222}],
  ib_new_line:[{id:15,customer_db_id:111},{id:16,customer_db_id:222}],
- ib_settings:[{key:'support_phone_office_1',value:'111'},{key:'support_phone_office_2',value:'222'},{key:'support_phone',value:'shared'}]
+ ib_settings:[{key:'support_phone_office_1',value:'111'},{key:'support_phone_office_2',value:'222'},{key:'support_phone',value:'shared'},{key:'customer_billing_status_office_1',value:{customers:{111:{initial_status:'active',changes:[{month:'2026-11',status:'inactive'}]}}}}]
 };
 
 async function officeBackup(){
@@ -39,10 +39,11 @@ test('selected-office backup includes related records and excludes the other off
  assert.equal(snapshot.format,'IBM_PG_OFFICE_V1');
  assert.equal(snapshot.office_id,1);
  assert.deepEqual(snapshot.tables.map(table=>table.key),backupTables);
- for(const table of snapshot.tables)assert.equal(table.rows.length,1,table.key);
+ for(const table of snapshot.tables)assert.equal(table.rows.length,table.key==='ib_settings'?2:1,table.key);
  assert.equal(snapshot.tables.find(table=>table.key==='ib_customers').rows[0].customer_id,'one');
  assert.equal(snapshot.tables.find(table=>table.key==='ib_bill_lines').rows[0].batch_id,1111);
  assert.equal(snapshot.tables.find(table=>table.key==='ib_settings').rows[0].key,'support_phone_office_1');
+ assert.equal(snapshot.tables.find(table=>table.key==='ib_settings').rows[1].value.customers['111'].changes[0].month,'2026-11');
  assert.doesNotThrow(()=>validateOfficeBackupSnapshot(snapshot,1));
 });
 
@@ -66,5 +67,5 @@ test('office restore rejects rows from another office and scopes every delete',a
  assert.ok(deletes.length>=backupTables.length-1);
  assert.ok(deletes.every(query=>query.sql.includes('WHERE')));
  assert.ok(deletes.every(query=>query.params[0]===1||Array.isArray(query.params[0])));
- assert.equal(queries.filter(query=>query.sql.startsWith('INSERT')).length,backupTables.length);
+ assert.equal(queries.filter(query=>query.sql.startsWith('INSERT')).length,backupTables.length+1);
 });

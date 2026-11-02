@@ -7,6 +7,7 @@ import {readSupportPhone} from './support-phone.js';
 import {readPaymentNumbers} from './payment-numbers.js';
 import {sortReportRowsByCustomerId} from './report-order.js';
 import {previousBillBalances,previousDueFor} from './carry-forward.js';
+import {readBillingStatus,billingStatusAt} from './customer-billing-status.js';
 
 export const finance=Router();
 const officeOf=(u,v)=>{const n=scope(u,v);return requireOffice(u,n);};
@@ -14,25 +15,25 @@ const selectedMonth=q=>month(q||currentMonth());
 const lockBillingOffice=(db,id)=>one(db,'SELECT id FROM ib_offices WHERE id=$1 FOR UPDATE',[id]);
 const laterProcessedBill=(db,id,m)=>one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2 AND status='processed' LIMIT 1",[id,m]);
 async function billData(db,officeId,m){
+ const history=await readBillingStatus(db,officeId);
  const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[officeId,m]);
- if(batch)return {batch,rows:await all(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 ORDER BY customer_name,id',[batch.id])};
+ if(batch){
+  const rows=await all(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 ORDER BY customer_name,id',[batch.id]);
+  const customers=rows.length?await all(db,'SELECT id,status FROM ib_customers WHERE id=ANY($1::BIGINT[])',[rows.map(row=>row.customer_db_id)]):[];
+  const lookup=new Map(customers.map(customer=>[String(customer.id),customer]));
+  return {batch,rows:rows.map(row=>({...row,customer_status:billingStatusAt(lookup.get(String(row.customer_db_id)),m,history)}))};
+ }
  const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[officeId]);
  const [payments,priorBalances]=await Promise.all([
   all(db,'SELECT customer_db_id,COALESCE(SUM(amount),0) AS amount FROM ib_payments WHERE office_id=$1 AND bill_month=$2 GROUP BY customer_db_id',[officeId,m]),
   previousBillBalances(db,officeId,m)
  ]);
  const paidByCustomer=new Map(payments.map(p=>[String(p.customer_db_id),p.amount]));
- return {batch:null,rows:customers.filter(c=>c.status==='active').map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,previousDueFor(c,priorBalances),paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
+ return {batch:null,rows:customers.filter(c=>billingStatusAt(c,m,history)==='active').map(c=>({...c,customer_status:'active',...billLine(c.monthly_bill,previousDueFor(c,priorBalances),paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
 }
 const publicBillRow=({pppoe_password,...row})=>row;
 const collectionBillRow=r=>({id:r.id,customer_db_id:r.customer_db_id,customer_id:r.customer_id,customer_name:r.customer_name,customer_status:r.customer_status,monthly_bill:r.monthly_bill,previous_due:r.previous_due,total_due:r.total_due,paid_amount:r.paid_amount,balance_due:r.balance_due,status:r.status});
-async function activeCustomerRows(db,rows){
- if(!rows.length)return [];
- const ids=rows.map(r=>r.customer_db_id);
- const active=await all(db,"SELECT id FROM ib_customers WHERE id=ANY($1::BIGINT[]) AND status='active'",[ids]);
- const activeIds=new Set(active.map(c=>String(c.id)));
- return rows.filter(r=>activeIds.has(String(r.customer_db_id))).map(r=>({...r,customer_status:'active'}));
-}
+const activeCustomerRows=rows=>rows.filter(row=>row.customer_status==='active');
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
  const data=await all(pool,`SELECT o.id AS office_id,o.office_name,o.manager,c.active,c.inactive,c.billing,p.received,i.isp,e.expenses,s.salary
@@ -49,7 +50,7 @@ finance.get('/dashboard',async(req,res)=>{
  }));
  res.json({month:m,rows});
 });
-finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);const rows=req.query.active_only==='1'?await activeCustomerRows(pool,bill.rows):bill.rows;res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
+finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);const rows=req.query.active_only==='1'?activeCustomerRows(bill.rows):bill.rows;res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
@@ -57,7 +58,8 @@ finance.post('/bills/process',async(req,res)=>{
   if(await one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[id,m]))fail(409,'This month is already processed for the office.');
   if(await laterProcessedBill(db,id,m))fail(409,'A later month is already processed. Reverse it before processing this month.');
   const priorBalances=await previousBillBalances(db,id,m,{lock:true});
-  const customers=(await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[id])).filter(c=>c.status==='active');
+  const history=await readBillingStatus(db,id);
+  const customers=(await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[id])).filter(c=>billingStatusAt(c,m,history)==='active');
   if(!customers.length)fail(400,'No active customers in the selected office.');
   const batch=await one(db,'INSERT INTO ib_bill_batches(office_id,bill_month) VALUES($1,$2) RETURNING *',[id,m]);
   for(const c of customers){
@@ -105,7 +107,7 @@ finance.post('/payments',async(req,res)=>{
   const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed' FOR UPDATE",[id,m]);
   let c,line;
   if(batch){line=await one(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 AND customer_db_id=$2 FOR UPDATE',[batch.id,b.customer_db_id]);if(!line)fail(404,'Customer is not in the processed bill.');}
-  else {c=await one(db,"SELECT * FROM ib_customers WHERE id=$1 AND office_id=$2 AND status='active' FOR UPDATE",[b.customer_db_id,id]);if(!c)fail(404,'Active customer not found.');}
+  else {c=await one(db,'SELECT * FROM ib_customers WHERE id=$1 AND office_id=$2 FOR UPDATE',[b.customer_db_id,id]);if(!c||billingStatusAt(c,m,await readBillingStatus(db,id))!=='active')fail(404,'Active customer not found for this bill month.');}
   const priorBalances=line?null:await previousBillBalances(db,id,m);
   const total=cents(line?line.total_due:billLine(c.monthly_bill,previousDueFor(c,priorBalances)).total_due);
   const already=line?cents(line.paid_amount):cents((await one(db,'SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments WHERE office_id=$1 AND customer_db_id=$2 AND bill_month=$3',[id,c.id,m])).n);
@@ -132,7 +134,7 @@ finance.get('/slips',async(req,res)=>{
  const customerId=Number(req.query.customer_db_id||0),filtered=customerId?rows.filter(r=>Number(r.customer_db_id)===customerId):rows;
  const ids=filtered.map(r=>r.customer_db_id);const customers=ids.length?await all(pool,'SELECT id,address,pppoe_username,status FROM ib_customers WHERE id=ANY($1::BIGINT[])',[ids]):[];
  const lookup=new Map(customers.map(c=>[String(c.id),c]));
- const visibleRows=req.query.active_only==='1'?filtered.filter(r=>lookup.get(String(r.customer_db_id))?.status==='active'):filtered;
+ const visibleRows=req.query.active_only==='1'?activeCustomerRows(filtered):filtered;
  const [support,paymentNumbers]=await Promise.all([readSupportPhone(pool,id),readPaymentNumbers(pool,id)]);
  const enriched=visibleRows.map(r=>({...(paymentCollector(req.user)?collectionBillRow(r):publicBillRow(r)),mobile:r.mobile,area:r.area,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
  res.json({office,month:m,processed:!!batch,support_phone:support.value,payment_numbers:paymentNumbers,rows:enriched});
@@ -142,7 +144,7 @@ finance.get('/report',async(req,res)=>{
  const customerIds=rows.map(r=>r.customer_db_id);
  const customers=customerIds.length?await all(pool,'SELECT id,pppoe_username,address,status FROM ib_customers WHERE id=ANY($1::BIGINT[])',[customerIds]):[];
  const customerDetails=new Map(customers.map(c=>[String(c.id),c]));
- const billRows=sortReportRowsByCustomerId(rows.filter(r=>customerDetails.get(String(r.customer_db_id))?.status==='active'));
+ const billRows=sortReportRowsByCustomerId(activeCustomerRows(rows));
  const detailedRows=billRows.map(r=>{
   const customer=customerDetails.get(String(r.customer_db_id));
   return {...publicBillRow(r),address:customer?.address??r.address??'',pppoe_username:customer?.pppoe_username||r.pppoe_username||r.customer_id||''};

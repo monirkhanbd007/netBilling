@@ -15,6 +15,7 @@ test('October carries active balances, excludes inactive customers, then closes 
  const query=async(sql,params=[])=>{
   if(['BEGIN','COMMIT','ROLLBACK'].includes(sql))return {rows:[]};
   if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,name:'Admin',username:'admin',role:'Super Admin',office_id:0}]};
+  if(sql.includes('FROM ib_settings'))return {rows:[{value:{customers:Object.fromEntries(customers.filter(customer=>customer.status==='inactive').map(customer=>[customer.id,{initial_status:'active',changes:[{month:'2026-10',status:'inactive'}]}]))}}]};
   if(sql.includes('FROM ib_offices WHERE id=$1 FOR UPDATE'))return {rows:[{id:4}]};
   if(sql.includes('FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2'))return {rows:params[1]==='2026-09'&&octoberBatch?[octoberBatch]:[]};
   if(sql.includes('FROM ib_bill_batches WHERE office_id=$1 AND bill_month<$2'))return {rows:params[1]==='2026-10'?[{id:9}]:[]};
