@@ -22,7 +22,7 @@ async function billData(db,officeId,m){
   previousBillBalances(db,officeId,m)
  ]);
  const paidByCustomer=new Map(payments.map(p=>[String(p.customer_db_id),p.amount]));
- return {batch:null,rows:customers.map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,previousDueFor(c,priorBalances),paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
+ return {batch:null,rows:customers.filter(c=>c.status==='active').map(c=>({...c,customer_status:c.status,...billLine(c.monthly_bill,previousDueFor(c,priorBalances),paidByCustomer.get(String(c.id))||0),customer_db_id:c.id}))};
 }
 const publicBillRow=({pppoe_password,...row})=>row;
 const collectionBillRow=r=>({id:r.id,customer_db_id:r.customer_db_id,customer_id:r.customer_id,customer_name:r.customer_name,customer_status:r.customer_status,monthly_bill:r.monthly_bill,previous_due:r.previous_due,total_due:r.total_due,paid_amount:r.paid_amount,balance_due:r.balance_due,status:r.status});
@@ -31,7 +31,7 @@ async function activeCustomerRows(db,rows){
  const ids=rows.map(r=>r.customer_db_id);
  const active=await all(db,"SELECT id FROM ib_customers WHERE id=ANY($1::BIGINT[]) AND status='active'",[ids]);
  const activeIds=new Set(active.map(c=>String(c.id)));
- return rows.filter(r=>activeIds.has(String(r.customer_db_id)));
+ return rows.filter(r=>activeIds.has(String(r.customer_db_id))).map(r=>({...r,customer_status:'active'}));
 }
 finance.get('/dashboard',async(req,res)=>{
  const m=selectedMonth(req.query.month),u=req.user,officeId=scope(u,req.query.office_id);
@@ -57,8 +57,8 @@ finance.post('/bills/process',async(req,res)=>{
   if(await one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[id,m]))fail(409,'This month is already processed for the office.');
   if(await laterProcessedBill(db,id,m))fail(409,'A later month is already processed. Reverse it before processing this month.');
   const priorBalances=await previousBillBalances(db,id,m,{lock:true});
-  const customers=await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[id]);
-  if(!customers.length)fail(400,'No customers in the selected office.');
+  const customers=(await all(db,'SELECT * FROM ib_customers WHERE office_id=$1 ORDER BY customer_name,id',[id])).filter(c=>c.status==='active');
+  if(!customers.length)fail(400,'No active customers in the selected office.');
   const batch=await one(db,'INSERT INTO ib_bill_batches(office_id,bill_month) VALUES($1,$2) RETURNING *',[id,m]);
   for(const c of customers){
    const x=billLine(c.monthly_bill,previousDueFor(c,priorBalances));

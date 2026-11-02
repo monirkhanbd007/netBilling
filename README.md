@@ -14,7 +14,7 @@ Standalone conversion of the attached **Internet Business Manager v1.4.6.18** Wo
 
 | Rule | Implementation |
 | --- | --- |
-| Monthly bill | One processed snapshot per office/month. The next month uses each customer's remaining balance from the latest earlier processed bill as `previous_due`; a customer without an earlier bill keeps the entered opening due. `total_due = monthly_bill + previous_due`. |
+| Monthly bill | One processed snapshot per office/month, generated for active customers only. The next month uses each active customer's remaining balance from the latest earlier processed bill as `previous_due`; a customer without an earlier bill keeps the entered opening due. `total_due = monthly_bill + previous_due`. Inactive customers are excluded from new bills and the collection pending list, including already processed months. Existing historical bill lines are retained. |
 | Collections | Partial payments reduce balance; methods: Cash, bKash, Nagad, Rocket, Bank, Other. Payments can be reversed. |
 | Dashboard due | `max(0, active customer monthly bill − received customer payments for selected month)`. |
 | Dashboard net | `received customer payments − ISP bill − office expenses − staff salary`. |

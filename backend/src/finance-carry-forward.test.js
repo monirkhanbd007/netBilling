@@ -3,11 +3,12 @@ import test from 'node:test';
 import app from './index.js';
 import {pool} from './db.js';
 
-test('October preview and processing use September remaining balances, then close September to new payments',async t=>{
+test('October carries active balances, excludes inactive customers, then closes September to new payments',async t=>{
  const originalQuery=pool.query,originalConnect=pool.connect;
  const customers=[
   {id:1,office_id:4,customer_id:'gns401',customer_name:'Partial payer',monthly_bill:'600.00',previous_due:'100.00',status:'active'},
-  {id:2,office_id:4,customer_id:'gns402',customer_name:'Fully paid',monthly_bill:'500.00',previous_due:'50.00',status:'active'}
+  {id:2,office_id:4,customer_id:'gns402',customer_name:'Fully paid',monthly_bill:'500.00',previous_due:'50.00',status:'active'},
+  {id:3,office_id:4,customer_id:'gns403',customer_name:'Inactive unpaid',monthly_bill:'600.00',previous_due:'100.00',status:'inactive'}
  ];
  let octoberBatch=null;
  const inserted=[];
@@ -18,7 +19,7 @@ test('October preview and processing use September remaining balances, then clos
   if(sql.includes('FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2'))return {rows:params[1]==='2026-09'&&octoberBatch?[octoberBatch]:[]};
   if(sql.includes('FROM ib_bill_batches WHERE office_id=$1 AND bill_month<$2'))return {rows:params[1]==='2026-10'?[{id:9}]:[]};
   if(sql.includes('FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2'))return {rows:params[1]==='2026-10'&&octoberBatch?[octoberBatch]:params[1]==='2026-09'?[{id:9}]:[]};
-  if(sql.includes('SELECT customer_db_id,balance_due FROM ib_bill_lines'))return {rows:[{customer_db_id:1,balance_due:'400.00'},{customer_db_id:2,balance_due:'0.00'}]};
+  if(sql.includes('SELECT customer_db_id,balance_due FROM ib_bill_lines'))return {rows:[{customer_db_id:1,balance_due:'400.00'},{customer_db_id:2,balance_due:'0.00'},{customer_db_id:3,balance_due:'700.00'}]};
   if(sql.includes('SELECT * FROM ib_customers WHERE office_id=$1'))return {rows:customers};
   if(sql.includes('GROUP BY customer_db_id'))return {rows:[]};
   if(sql.includes('SELECT COALESCE(SUM(amount),0) AS n FROM ib_payments'))return {rows:[{n:'0.00'}]};
@@ -36,9 +37,11 @@ test('October preview and processing use September remaining balances, then clos
  const preview=await fetch(`${base}/bills?office_id=4&month=2026-10`,{headers});
  assert.equal(preview.status,200);
  const rows=(await preview.json()).rows;
+ assert.deepEqual(rows.map(row=>row.customer_db_id),[1,2]);
  assert.deepEqual(rows.map(row=>[row.previous_due,row.total_due]),[['400.00','1000.00'],['0.00','500.00']]);
  const processed=await fetch(`${base}/bills/process`,{method:'POST',headers,body:JSON.stringify({office_id:4,month:'2026-10'})});
  assert.equal(processed.status,201);
+ assert.deepEqual(inserted.map(values=>values[1]),[1,2]);
  assert.deepEqual(inserted.map(values=>[values[7],values[8]]),[['400.00','1000.00'],['0.00','500.00']]);
   const latePayment=await fetch(`${base}/payments`,{method:'POST',headers,body:JSON.stringify({office_id:4,month:'2026-09',customer_db_id:1,amount:'100.00',payment_date:'2026-10-01',payment_method:'Cash'})});
   assert.equal(latePayment.status,409);
@@ -46,4 +49,15 @@ test('October preview and processing use September remaining balances, then clos
   const reverseSeptember=await fetch(`${base}/bills/reverse`,{method:'POST',headers,body:JSON.stringify({office_id:4,month:'2026-09'})});
   assert.equal(reverseSeptember.status,409);
   assert.match((await reverseSeptember.json()).error,/later bill/);
+
+ octoberBatch=null;
+ customers.forEach(customer=>{customer.status='inactive';});
+ const emptyPreview=await fetch(`${base}/bills?office_id=4&month=2026-10`,{headers});
+ assert.equal(emptyPreview.status,200);
+ assert.deepEqual((await emptyPreview.json()).rows,[]);
+ const emptyProcess=await fetch(`${base}/bills/process`,{method:'POST',headers,body:JSON.stringify({office_id:4,month:'2026-10'})});
+ assert.equal(emptyProcess.status,400);
+ assert.match((await emptyProcess.json()).error,/No active customers/);
+ assert.equal(octoberBatch,null);
+ assert.equal(inserted.length,2);
 });

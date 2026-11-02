@@ -108,6 +108,6 @@ test('274 customers with two inactive zero bills produce 272 report and A4 slip 
   assert.deepEqual(report.rows.map(row=>row.customer_db_id).sort((a,b)=>a-b),customerList.filter(row=>row.status==='active').map(row=>row.id).sort((a,b)=>a-b));
   assert.equal(report.total_due,'159000.00');
   assert.equal((await get('slips','&active_only=1')).rows.length,272);
-  assert.equal((await get('slips')).rows.length,274);
+  assert.equal((await get('slips')).rows.length,processed?274:272);
  }
 });

@@ -20,9 +20,9 @@ test('live collection offers only active customers with a remaining balance', ()
   assert.deepEqual(pendingBillCustomers(bill, customers, 5, '2026-09'), []);
 });
 
-test('processed collection retains unpaid bill lines even if service is now inactive', () => {
+test('processed collection excludes inactive customers with unpaid bill lines', () => {
   const bill = {office_id: 4, month: '2026-09', batch: {id: 8}, rows};
-  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-09').map(row => row.customer_db_id), [2, 3]);
+  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-09').map(row => row.customer_db_id), [2]);
 });
 
 test('payment collector can use active status from bill data without customer credentials', () => {
@@ -31,4 +31,13 @@ test('payment collector can use active status from bill data without customer cr
     {customer_db_id: 2, balance_due: '300.00', customer_status: 'inactive'}
   ]};
   assert.deepEqual(pendingBillCustomers(bill, [], 4, '2026-09').map(row => row.customer_db_id), [1]);
+  bill.batch = {id: 8};
+  assert.deepEqual(pendingBillCustomers(bill, [], 4, '2026-09').map(row => row.customer_db_id), [1]);
+});
+
+test('current inactive status overrides an active status in an older bill response', () => {
+  const bill = {office_id: 4, month: '2026-10', batch: {id: 9}, rows: [
+    {customer_db_id: 3, balance_due: '300.00', customer_status: 'active'}
+  ]};
+  assert.deepEqual(pendingBillCustomers(bill, customers, 4, '2026-10'), []);
 });

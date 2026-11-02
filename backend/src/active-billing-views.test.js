@@ -9,9 +9,9 @@ test('Reports and Monthly Bill Sheet show only currently active customers for li
   {id:1,office_id:4,customer_id:'gns401',customer_name:'Active',status:'active',monthly_bill:'100.00',previous_due:'0.00',address:'Active Road'},
   {id:2,office_id:4,customer_id:'gns402',customer_name:'Inactive',status:'inactive',monthly_bill:'200.00',previous_due:'50.00',address:'Inactive Road'}
  ];
- let processed=false;
+ let processed=false,role='Super Admin';
  pool.query=async(sql,params=[])=>{
-  if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,name:'Admin',username:'admin',role:'Super Admin',office_id:0}]};
+  if(sql.includes('FROM ib_sessions'))return {rows:[{id:7,name:'Admin',username:'admin',role,office_id:0}]};
   if(sql.startsWith('SELECT * FROM ib_bill_batches'))return {rows:processed?[{id:9}]:[]};
   if(sql.includes('FROM ib_bill_batches')&&sql.includes('bill_month<$2'))return {rows:[]};
   if(sql.startsWith('SELECT * FROM ib_customers WHERE office_id=$1'))return {rows:customers};
@@ -37,12 +37,16 @@ test('Reports and Monthly Bill Sheet show only currently active customers for li
   const bill=await get('bills');
   assert.equal(Boolean(bill.batch),processed);
   assert.deepEqual(bill.rows.map(row=>row.customer_id),['gns401']);
+  assert.equal(bill.rows[0].customer_status,'active');
   const report=await get('report');
   assert.deepEqual(report.rows.map(row=>row.customer_id),['gns401']);
   assert.equal(report.count,1);
   assert.deepEqual([report.monthly,report.previous_due,report.total_due,report.paid,report.balance],['100.00','0.00','100.00','0.00','100.00']);
   const collectionResponse=await fetch(`http://127.0.0.1:${server.address().port}/api/bills?office_id=4&month=2026-10`,{headers:{Cookie:'ibm_session=test'}});
   assert.equal(collectionResponse.status,200);
-  assert.deepEqual((await collectionResponse.json()).rows.map(row=>row.customer_id),['gns401','gns402']);
+  assert.deepEqual((await collectionResponse.json()).rows.map(row=>row.customer_id),processed?['gns401','gns402']:['gns401']);
  }
+ role='Payment Collector';
+ const collectorBill=await get('bills');
+ assert.deepEqual(collectorBill.rows.map(row=>[row.customer_id,row.customer_status]),[['gns401','active']]);
 });
