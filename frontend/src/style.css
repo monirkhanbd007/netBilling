@@ -112,6 +112,7 @@ tbody tr.inactive-customer-row:hover{background:#eae2f5}
 .inactive-customer-row td{color:#57466e}
 .inactive-customer-row td:first-child{box-shadow:inset 3px 0 #9070b3}
 .inactive-customer-row .tag.inactive{background:#e5d9f3;color:#623c82}
+.carried-due-note{grid-column:1/-1;margin:0;padding:12px 14px;border-radius:8px;background:#f1edfc;color:#51318c;font-size:12px;line-height:1.6}
 @media screen and (max-width:600px){.customer-filters input{flex:1 1 100%;max-width:none}.customer-status-filter{width:100%}.customer-status-filter select{flex:1;min-width:0;font-size:16px;min-height:44px}}
 
 .payment-history-tools{display:flex;align-items:center;gap:10px;min-width:0}

@@ -13,7 +13,7 @@ export const finance=Router();
 const officeOf=(u,v)=>{const n=scope(u,v);return requireOffice(u,n);};
 const selectedMonth=q=>month(q||currentMonth());
 const lockBillingOffice=(db,id)=>one(db,'SELECT id FROM ib_offices WHERE id=$1 FOR UPDATE',[id]);
-const laterProcessedBill=(db,id,m)=>one(db,"SELECT id FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2 AND status='processed' LIMIT 1",[id,m]);
+const laterProcessedBill=(db,id,m)=>one(db,"SELECT id,bill_month FROM ib_bill_batches WHERE office_id=$1 AND bill_month>$2 AND status='processed' ORDER BY bill_month DESC LIMIT 1",[id,m]);
 async function billData(db,officeId,m){
  const history=await readBillingStatus(db,officeId);
  const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed'",[officeId,m]);
@@ -50,7 +50,12 @@ finance.get('/dashboard',async(req,res)=>{
  }));
  res.json({month:m,rows});
 });
-finance.get('/bills',async(req,res)=>{const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);const rows=req.query.active_only==='1'?activeCustomerRows(bill.rows):bill.rows;res.json({month:m,office_id:id,...bill,rows:sortReportRowsByCustomerId(rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});});
+finance.get('/bills',async(req,res)=>{
+ const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),bill=await billData(pool,id,m);
+ const rows=req.query.active_only==='1'?activeCustomerRows(bill.rows):bill.rows;
+ const collectionMonth=req.query.collection==='1'?(await laterProcessedBill(pool,id,m))?.bill_month||m:undefined;
+ res.json({month:m,office_id:id,...bill,collection_month:collectionMonth,rows:sortReportRowsByCustomerId(rows).map(paymentCollector(req.user)?collectionBillRow:publicBillRow)});
+});
 finance.post('/bills/process',async(req,res)=>{
  const id=officeOf(req.user,req.body.office_id),m=selectedMonth(req.body.month);
  const result=await tx(async db=>{
@@ -98,12 +103,19 @@ finance.get('/payments/:id',async(req,res)=>{
  res.json(payment);
 });
 finance.post('/payments',async(req,res)=>{
- const u=req.user,b=req.body,id=officeOf(u,b.office_id),m=selectedMonth(b.month),paymentDate=date(b.payment_date||today()),amount=money(b.amount);
+ const u=req.user,b=req.body,id=officeOf(u,b.office_id),paymentDate=date(b.payment_date||today()),amount=money(b.amount);
+ let m=selectedMonth(b.month);
  if(amount<=0)fail(400,'Payment amount must be greater than zero.');
  const methods=['Cash','bKash','Nagad','Rocket','Bank','Other'],method=methods.includes(b.payment_method)?b.payment_method:'Other';
  const row=await tx(async db=>{
   await lockBillingOffice(db,id);
-  if(await laterProcessedBill(db,id,m))fail(409,'This balance was carried into a later bill. Collect the payment against that bill month.');
+  const later=await laterProcessedBill(db,id,m);
+  const collectionMonth=later?.bill_month||m;
+  if(b.receive_due===true&&b.collection_month&&b.collection_month!==collectionMonth)fail(409,'The payment bill month has changed. Review the updated month and receive the due bill again.',{collection_month:collectionMonth});
+  if(later){
+   if(b.receive_due!==true)fail(409,'This balance was carried into a later bill. Use Receive due bill to record the payment in the latest bill month.',{collection_month:later.bill_month});
+   m=later.bill_month;
+  }
   const batch=await one(db,"SELECT * FROM ib_bill_batches WHERE office_id=$1 AND bill_month=$2 AND status='processed' FOR UPDATE",[id,m]);
   let c,line;
   if(batch){line=await one(db,'SELECT * FROM ib_bill_lines WHERE batch_id=$1 AND customer_db_id=$2 FOR UPDATE',[batch.id,b.customer_db_id]);if(!line)fail(404,'Customer is not in the processed bill.');}
@@ -137,7 +149,8 @@ finance.get('/slips',async(req,res)=>{
  const visibleRows=req.query.active_only==='1'?activeCustomerRows(filtered):filtered;
  const [support,paymentNumbers]=await Promise.all([readSupportPhone(pool,id),readPaymentNumbers(pool,id)]);
  const enriched=visibleRows.map(r=>({...(paymentCollector(req.user)?collectionBillRow(r):publicBillRow(r)),mobile:r.mobile,area:r.area,address:lookup.get(String(r.customer_db_id))?.address||'',pppoe_username:lookup.get(String(r.customer_db_id))?.pppoe_username||'',bill_month:m}));
- res.json({office,month:m,processed:!!batch,support_phone:support.value,payment_numbers:paymentNumbers,rows:enriched});
+ const collectionMonth=req.query.collection==='1'?(await laterProcessedBill(pool,id,m))?.bill_month||m:undefined;
+ res.json({office,month:m,collection_month:collectionMonth,processed:!!batch,support_phone:support.value,payment_numbers:paymentNumbers,rows:enriched});
 });
 finance.get('/report',async(req,res)=>{
  const id=officeOf(req.user,req.query.office_id),m=selectedMonth(req.query.month),{batch,rows}=await billData(pool,id,m);
